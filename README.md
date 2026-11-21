@@ -14,7 +14,7 @@ with no one topping it up.
 Open the [dashboard](https://dashboardparapet.vercel.app/) and press **Run a rescue** with a browser wallet on
 Base Sepolia (a little test ETH for gas). It calls `DemoLoan.run()`, which resets the demo loan (WETH back to
 $2,000, the last top-up returned to the shield reserve, HF 1.2) and drops WETH to $1,800 in one transaction.
-The page then times the real Reactive loop until the `Rescued` event lands, usually 5 to 8 Base blocks later.
+The page then walks through five steps as they happen: wallet connected, transaction sent, loan under its trigger on Base, `RescueRequested` from ShieldReactive on Lasna, and the `Rescued` event on Base, usually 5 to 8 Base blocks after the price drop.
 One run a minute for everyone.
 
 ## How it works
@@ -100,7 +100,7 @@ monthly fee per watched loan, would close that gap; the mainnet REACT price deci
 | DemoLoan | Base Sepolia | [`0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF`](https://base-sepolia.blockscout.com/address/0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF) |
 | Test USDC | Base Sepolia | [`0xA91733b5641d627eD461420D0EC1D1277fC7bF37`](https://base-sepolia.blockscout.com/address/0xA91733b5641d627eD461420D0EC1D1277fC7bF37) |
 
-Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`.
+Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`. Source is verified for every Base Sepolia contract (WETH and USDC on Blockscout, the rest on Sourcify as exact matches).
 
 ### Full-loop transactions (origin event → callback)
 
