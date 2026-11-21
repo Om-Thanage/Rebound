@@ -12,6 +12,7 @@ import {MockAaveOracle} from "../src/mocks/MockAaveOracle.sol";
 import {MockAavePool} from "../src/mocks/MockAavePool.sol";
 import {LiquidationShield, IAavePool, IAaveOracle, IWETH} from "../src/LiquidationShield.sol";
 import {ShieldReactive} from "../src/ShieldReactive.sol";
+import {DemoLoan} from "../src/DemoLoan.sol";
 
 /// Stands in for the Reactive system contract at 0x8888...: records subscriptions and callback requests.
 contract MockSystem {
@@ -303,5 +304,54 @@ contract ShieldTest is Test {
         assertGe(hf, 1.4e18);
         assertLt(hf, 1.401e18);
     }
-}
 
+    // ---- DemoLoan: the dashboard's one-click rescue
+
+    /// Replay every oracle price event and shield snapshot recorded since vm.recordLogs, in log order.
+    function _relayAll() internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            uint256 t0 = uint256(logs[i].topics[0]);
+            bool isSnap = logs[i].emitter == address(shield) && t0 == rc.SNAPSHOT_TOPIC();
+            bool isPrice = logs[i].emitter == address(oracle) && t0 == rc.PRICE_UPDATED_TOPIC();
+            if (!isSnap && !isPrice) continue;
+            IReactive.LogRecord memory l = _log(logs[i].emitter, t0, uint256(logs[i].topics[1]), logs[i].data);
+            vm.prank(SYSTEM_ADDR);
+            rc.react(l);
+        }
+    }
+
+    function _deployDemo() internal returns (DemoLoan demo) {
+        vm.recordLogs();
+        demo = new DemoLoan{value: 0.007 ether}(weth, usdc, oracle, pool, shield, 0.003 ether);
+        _relayAll();
+    }
+
+    function test_demoRunTriggersRescueAndResets() public {
+        DemoLoan demo = _deployDemo();
+        assertEq(_hf(address(demo)), 1.2e18);
+
+        for (uint256 r = 1; r <= 3; ++r) {
+            uint256 before = sys.callbackCount();
+            vm.recordLogs();
+            demo.run();
+            _relayAll();
+            assertEq(sys.callbackCount(), before + 1, "one rescue requested per run");
+            _deliverLastCallback();
+            assertGe(_hf(address(demo)), 1.4e18, "rescued to target");
+            vm.warp(block.timestamp + 61);
+        }
+        // each run returns the previous top-up to the reserve, so over three runs only the fees are spent
+        (uint128 reserve,,,) = shield.protections(address(demo));
+        uint256 lastTopUp = pool.collateral(address(demo)) - demo.BASE_COLLATERAL();
+        assertEq(reserve + lastTopUp, 0.003 ether - 3 * 0.0001 ether);
+        assertEq(demo.runs(), 3);
+    }
+
+    function test_demoRunHasCooldown() public {
+        DemoLoan demo = _deployDemo();
+        demo.run();
+        vm.expectRevert(abi.encodeWithSelector(DemoLoan.TooSoon.selector, block.timestamp + 60));
+        demo.run();
+    }
+}
