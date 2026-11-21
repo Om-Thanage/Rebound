@@ -1,6 +1,6 @@
 # Parapet: a self-funding liquidation shield on Reactive Omni
 
-**Track:** Every Second Counts · **Networks:** Reactive Lasna + Base Sepolia · **Live dashboard:** [`dashboard/index.html`](dashboard/index.html)
+**Track:** Every Second Counts · **Networks:** Reactive Lasna + Base Sepolia · **Live dashboard:** [dashboardparapet.vercel.app](https://dashboardparapet.vercel.app/) ([`dashboard/`](dashboard/))
 
 When a borrower's collateral price drops, an Aave-style loan can be liquidated in seconds, and the liquidator
 takes a bonus (about 5% on WETH in Aave V3). Parapet watches the price event itself through a Reactive
@@ -8,6 +8,14 @@ contract and tops the loan back up **about 1.2 seconds** (median of 20 rounds) a
 server. It charges **0.3% of the collateral it adds** (floor 0.0001 ETH). That fee is unwrapped to ETH inside
 the shield, where Reactive's callback proxy takes the callback gas from it, so the destination side runs
 with no one topping it up.
+
+## Try it
+
+Open the [dashboard](https://dashboardparapet.vercel.app/) and press **Run a rescue** with a browser wallet on
+Base Sepolia (a little test ETH for gas). It calls `DemoLoan.run()`, which resets the demo loan (WETH back to
+$2,000, the last top-up returned to the shield reserve, HF 1.2) and drops WETH to $1,800 in one transaction.
+The page then times the real Reactive loop until the `Rescued` event lands, usually 5 to 8 Base blocks later.
+One run a minute for everyone.
 
 ## How it works
 
@@ -89,6 +97,7 @@ monthly fee per watched loan, would close that gap; the mainnet REACT price deci
 | MockAavePool | Base Sepolia | [`0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c`](https://base-sepolia.blockscout.com/address/0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c) |
 | MockAaveOracle | Base Sepolia | [`0x49074f7961c01416cf5A57d13df664C32fb33345`](https://base-sepolia.blockscout.com/address/0x49074f7961c01416cf5A57d13df664C32fb33345) |
 | Test WETH | Base Sepolia | [`0xac1f5822da429129e15aB706D3888769De7d5cF4`](https://base-sepolia.blockscout.com/address/0xac1f5822da429129e15aB706D3888769De7d5cF4) |
+| DemoLoan | Base Sepolia | [`0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF`](https://base-sepolia.blockscout.com/address/0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF) |
 | Test USDC | Base Sepolia | [`0xA91733b5641d627eD461420D0EC1D1277fC7bF37`](https://base-sepolia.blockscout.com/address/0xA91733b5641d627eD461420D0EC1D1277fC7bF37) |
 
 Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`.
@@ -109,7 +118,7 @@ Needs [Foundry](https://getfoundry.sh), `jq`, and a testnet wallet with Base Sep
 
 ```bash
 cp .env.example .env        # then put your testnet PRIVATE_KEY in .env
-forge test                  # 12 tests, incl. a 256-run fuzz test of the rescue maths
+forge test                  # 14 tests, incl. a 256-run fuzz test of the rescue maths
 bash script/deploy.sh       # predicts both addresses, deploys Lasna then Base, writes deployments.env
 bash script/demo.sh 1800    # opens and protects a loan, crashes WETH, times the rescue
 bash script/bench.sh 20     # 20 timed rounds -> results/bench.csv (START=n continues a run)
@@ -124,6 +133,7 @@ Base Sepolia's public RPC and the `Rescued` events from Blockscout, and refreshe
 | Path | What |
 |---|---|
 | `src/LiquidationShield.sol` | destination contract: reserves, rescue, fee → gas, ops ledger |
+| `src/DemoLoan.sol` | a protected loan anyone can reset and crash in one call, for the dashboard's Run a rescue |
 | `src/ShieldReactive.sol` | reactive contract: mirrors loans, re-prices on each price event, requests callbacks |
 | `src/mocks/` | lending pool with Aave V3's signatures and HF maths, settable oracle, test tokens |
 | `test/Shield.t.sol` | full loop with a mocked system contract and callback proxy, auth, cooldown, partial rescue, fuzz |
