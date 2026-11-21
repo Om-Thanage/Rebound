@@ -1,6 +1,6 @@
 # Parapet: a self-funding liquidation shield on Reactive Omni
 
-**Track:** Every Second Counts · **Networks:** Reactive Lasna + Base Sepolia · **Live dashboard:** [dashboardparapet.vercel.app](https://dashboardparapet.vercel.app/) ([`dashboard/`](dashboard/))
+**Track:** Every Second Counts · **Networks:** Reactive Lasna + Base Sepolia · **Live dashboard:** [parapet-shield.vercel.app](https://parapet-shield.vercel.app/) ([`dashboard/`](dashboard/))
 
 When a borrower's collateral price drops, an Aave-style loan can be liquidated in seconds, and the liquidator
 takes a bonus (about 5% on WETH in Aave V3). Parapet watches the price event itself through a Reactive
@@ -9,13 +9,77 @@ server. It charges **0.3% of the collateral it adds** (floor 0.0001 ETH). That f
 the shield, where Reactive's callback proxy takes the callback gas from it, so the destination side runs
 with no one topping it up.
 
+## In plain words
+
+- **The problem.** You borrow USDC against WETH. If WETH falls far enough, anyone may repay part of your loan
+  and take your WETH at a discount (Aave's liquidation bonus, about 5%). Bots do this within seconds.
+- **What Parapet does.** You leave some spare WETH with Parapet and say when to act (a health factor, for
+  example 1.15) and how far to recover (for example 1.40). When the price drop pushes your loan under 1.15,
+  Parapet adds just enough of your spare WETH as collateral to bring it back to 1.40, before a liquidator can act.
+- **What it costs.** Nothing until it rescues you. Each rescue costs 0.3% of the WETH it adds (at least
+  0.0001 WETH), against the ~5% you would lose to a liquidation.
+- **Why it is fast and needs no bot.** No server watches your loan. A Reactive contract on Reactive Network is
+  subscribed to the price feed's events, so the price change itself starts the rescue. On Reactive Omni (~1 s
+  blocks) the whole loop took a median of 1.2 seconds in our tests.
+- **What you can always do.** Take your spare WETH back, change your trigger and target, or stop protection.
+  Parapet can only add collateral to your loan; it can never withdraw it or move your funds elsewhere.
+
 ## Try it
 
-Open the [dashboard](https://dashboardparapet.vercel.app/) and press **Run a rescue** with a browser wallet on
+Open the [dashboard](https://parapet-shield.vercel.app/) and press **Run a rescue** with a browser wallet on
 Base Sepolia (a little test ETH for gas). It calls `DemoLoan.run()`, which resets the demo loan (WETH back to
 $2,000, the last top-up returned to the shield reserve, HF 1.2) and drops WETH to $1,800 in one transaction.
 The page then walks through five steps as they happen: wallet connected, transaction sent, loan under its trigger on Base, `RescueRequested` from ShieldReactive on Lasna, and the `Rescued` event on Base, usually 5 to 8 Base blocks after the price drop.
 One run a minute for everyone.
+
+## Protect your own loan (testnet)
+
+Everything runs on Base Sepolia with test tokens: test WETH is wrapped from Base Sepolia ETH, and test USDC is
+borrowed from the demo pool. You need [Foundry](https://getfoundry.sh) (`cast`) and a wallet with about
+0.01 Base Sepolia ETH; `$KEY` is that wallet's private key, kept in your own shell or `.env`.
+
+```bash
+RPC=https://sepolia.base.org
+WETH=0xac1f5822da429129e15aB706D3888769De7d5cF4
+USDC=0xA91733b5641d627eD461420D0EC1D1277fC7bF37
+POOL=0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c
+SHIELD=0x3796897b27240f329b32184f2C2cBd6666A1EeaE
+ME=$(cast wallet address --private-key $KEY)
+tx() { cast send "$@" --rpc-url $RPC --private-key $KEY; }
+
+# 1. Get 0.008 test WETH and let the pool and the shield use it
+tx $WETH "deposit()" --value 0.008ether
+tx $WETH "approve(address,uint256)" $POOL $(cast max-uint)
+tx $WETH "approve(address,uint256)" $SHIELD $(cast max-uint)
+
+# 2. Open a loan: 0.005 WETH collateral, borrow 7 USDC (HF about 1.18 at $2,000)
+tx $POOL "supply(address,uint256,address,uint16)" $WETH 5000000000000000 $ME 0
+tx $POOL "borrow(address,uint256,uint256,uint16,address)" $USDC 7000000 2 0 $ME
+
+# 3. Protect it: act under HF 1.15, recover to 1.40, keep 0.003 WETH in reserve
+tx $SHIELD "protect(uint64,uint64,uint256)" 1150000000000000000 1400000000000000000 3000000000000000
+
+# 4. Check it any time
+cast call $POOL "getUserAccountData(address)(uint256,uint256,uint256,uint256,uint256,uint256)" $ME --rpc-url $RPC  # last value = HF
+cast call $SHIELD "protections(address)(uint128,uint64,uint64,uint64)" $ME --rpc-url $RPC  # reserve, trigger, target, last rescue
+```
+
+The next price drop under your trigger rescues you. You don't have to wait: anyone's **Run a rescue** on the
+dashboard moves the shared test price to $1,800, which takes this example loan to about 1.06, so it is rescued
+in the same second as the demo loan.
+The test price is shared and sits at $1,800 after each demo run, so a loan you open then already reads about
+1.06; it is rescued on the next price event, such as the next **Run a rescue**.
+
+| You want to | Call |
+|---|---|
+| Add more reserve | `protect(trigger, target, amount)` again with the extra amount |
+| Change when it acts | `protect(newTrigger, newTarget, 0)` (trigger above 1.0, target above trigger) |
+| Take reserve back | `withdrawReserve(amount)`; taking all of it turns protection off |
+| Borrow more or add collateral yourself | do it on the pool, then `sync(yourAddress)` so the Reactive contract sees the new numbers |
+| Close the loan | `approve(POOL, amount)` on USDC, `repay(USDC, amount, 2, you)` and `withdraw(WETH, amount, you)` on the pool, then `withdrawReserve(all)` on the shield |
+
+On mainnet the shield would point at the real Aave V3 Pool and oracle: it only calls `getUserAccountData` and
+`supply(asset, amount, onBehalfOf, 0)`, which Aave V3 has with the same signatures.
 
 ## How it works
 
@@ -133,6 +197,18 @@ node script/export-bench.mjs  # feeds the dashboard's speed section
 
 Open the dashboard over any static server (for example `npx serve dashboard`). It reads the contracts over
 Base Sepolia's public RPC and the `Rescued` events from Blockscout, and refreshes every 10 seconds.
+
+## Submission checklist
+
+| The brief asks for | Where it is |
+|---|---|
+| Public repository | this repository (MIT licence for our code; libraries keep their own) |
+| Deployed contract addresses | [Deployed contracts](#deployed-contracts), all source-verified |
+| Transaction hashes for the full loop, origin event to callback | [Full-loop transactions](#full-loop-transactions-origin-event--callback): Base price event → Lasna `RescueRequested` → Base rescue |
+| Demo video under three minutes | link to be added |
+| Track: Every Second Counts on Base Sepolia | Reactive Lasna + Base Sepolia; latency measured across the full loop in [Measured on live testnets](#measured-on-live-testnets) |
+| Built during the event | every commit is from 21 to 22 November 2026, inside the event; `forge-std` and `reactive-lib-omni` are dependencies |
+| Timestamps, not block counts, for timers on Base | the shield's 10 s cooldown and DemoLoan's 60 s cooldown use `block.timestamp` |
 
 ## Repository
 
