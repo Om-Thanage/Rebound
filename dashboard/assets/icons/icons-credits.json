@@ -1,0 +1,24 @@
+[
+  {
+    "file": "ui-box.svg",
+    "icon": "ui:box",
+    "name": "Box",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  },
+  {
+    "file": "ui-server.svg",
+    "icon": "ui:server",
+    "name": "Server",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  }
+]

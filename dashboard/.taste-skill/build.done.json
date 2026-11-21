@@ -1,0 +1,11 @@
+{
+ "page": "index.html",
+ "url": null,
+ "root": null,
+ "kind": "software",
+ "category": "liquidation shield for Aave-style loans",
+ "primary": "Open the live dashboard",
+ "rounds": 3,
+ "start": "2026-11-21T17:00:38.471Z",
+ "by": "gate.mjs --start"
+}

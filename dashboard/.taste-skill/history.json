@@ -1,0 +1,20 @@
+{
+ "palettes": [
+  "white-mint-tiles"
+ ],
+ "types": [
+  "gabarito"
+ ],
+ "dealt": [
+  "gabarito",
+  "instrument",
+  "geist"
+ ],
+ "moments": [
+  {
+   "id": "liquid-type",
+   "at": "2026-11-21T17:01:00.493Z",
+   "seed": "b5333eb8"
+  }
+ ]
+}

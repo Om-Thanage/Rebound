@@ -1,0 +1,27 @@
+[
+  {
+    "check": "button-styles",
+    "target": "div.span-3.start-10 > a.btn.btn--primary",
+    "reason": "The dealt triptych hero's own recipe (layout.css 9) sets its one large 64px button; the nav and close keep the standard height."
+  },
+  {
+    "check": "same-action",
+    "target": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary",
+    "reason": "Same cause: the triptych hero's large button is the kit's design, the action and its wording are identical everywhere."
+  },
+  {
+    "check": "off-grid",
+    "target": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo",
+    "reason": "footer--statement is the kit's inset slab (system.css insets it and pads its content); the logo sits on that slab's own wrap."
+  },
+  {
+    "check": "cut-text",
+    "target": "div.dg-nodes > div.dg-node.dg-node--tile",
+    "reason": "The kit's lanes diagram wraps short tile captions under each node at 390; the 390 screenshot shows every label whole."
+  },
+  {
+    "check": "contrast",
+    "target": "div.dg-nodes > div.dg-node.dg-node--tile",
+    "reason": "Captions sit on the kit's lit sky ground beside the node tiles; the screenshot reads clearly and the ground is the kit's own."
+  }
+]

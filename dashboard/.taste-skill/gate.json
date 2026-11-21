@@ -1,0 +1,422 @@
+{
+ "start": "2026-11-21T17:00:38.471Z",
+ "round": 3,
+ "idle": 0,
+ "errors": 0,
+ "status": "open",
+ "history": [
+  {
+   "at": "2026-11-21T17:18:12.386Z",
+   "mode": "manual",
+   "status": "fail",
+   "fails": 19,
+   "round": 1,
+   "reused": false,
+   "stopHookActive": false
+  },
+  {
+   "at": "2026-11-21T17:21:02.926Z",
+   "mode": "manual",
+   "status": "fail",
+   "fails": 4,
+   "round": 2,
+   "reused": false,
+   "stopHookActive": false
+  },
+  {
+   "at": "2026-11-21T17:23:45.234Z",
+   "mode": "manual",
+   "status": "open",
+   "fails": 1,
+   "round": 3,
+   "reused": false,
+   "stopHookActive": false
+  },
+  {
+   "at": "2026-11-21T17:25:29.580Z",
+   "mode": "hook",
+   "host": "claude",
+   "decision": "allow",
+   "reason": "no build is active here",
+   "stopHookActive": false
+  }
+ ],
+ "max": 3,
+ "marker": {
+  "page": "index.html",
+  "url": null,
+  "root": null,
+  "kind": "software",
+  "category": "liquidation shield for Aave-style loans",
+  "primary": "Open the live dashboard",
+  "rounds": 3,
+  "start": "2026-11-21T17:00:38.471Z",
+  "by": "gate.mjs --start"
+ },
+ "manual": true,
+ "roundKey": "0accb743f756be3d:9ba6fd8d",
+ "roundFree": false,
+ "idleFree": false,
+ "blockKey": null,
+ "fp": "0accb743f756be3d",
+ "page": "index.html",
+ "found": {
+  "fails": [
+   {
+    "check": "button-styles",
+    "where": "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\"",
+    "msg": "one button style (soft, fill #232323) in 2 heights: 44, 64px (\"See the live shield\" 64px, \"See the live shield\" 44px)",
+    "fix": "one primary and one secondary button: one shape, one height per size, one label size",
+    "widths": [
+     1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "button-styles"
+    ],
+    "wheres": [
+     "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\""
+    ]
+   },
+   {
+    "check": "same-action",
+    "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\"",
+    "msg": "\"See the live shield\" appears 3 times in different looks: 44px and 64px tall, labels at 16px and 20px",
+    "fix": "draw one action the same way everywhere (only the nav copy may be one size smaller)",
+    "widths": [
+     1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "same-action"
+    ],
+    "wheres": [
+     "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\""
+    ]
+   },
+   {
+    "check": "off-grid",
+    "where": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\"",
+    "msg": "left edge at 103.5px, 23.5px off the page margin at 80px (23 elements, like span.mark.mark--initial)",
+    "fix": "move it onto the page margin, or the column edge its section uses",
+    "widths": [
+     1440,
+     390
+    ],
+    "from": "consistency",
+    "ids": [
+     "off-grid"
+    ],
+    "wheres": [
+     "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\""
+    ]
+   },
+   {
+    "check": "section-air",
+    "where": "section#speed / section#fees",
+    "msg": "637px of air between the content of these two sections: 128-480px (64-600px WARN) (SR-3)",
+    "fix": "keep 128-480px of air between the content of neighbouring sections (112-420px on a phone): the sections' padding (--padt, --padb)",
+    "widths": [
+     1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "section-air"
+    ],
+    "wheres": [
+     "section#speed / section#fees"
+    ]
+   },
+   {
+    "check": "cut-text",
+    "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
+    "msg": "runs past the edge of its box div.panel > div.dg > div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
+    "fix": "give the text room: no overflow clipping a line, no line past its box",
+    "widths": [
+     390
+    ],
+    "from": "consistency",
+    "ids": [
+     "cut-text"
+    ],
+    "wheres": [
+     "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+    ]
+   },
+   {
+    "check": "contrast",
+    "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
+    "msg": "body text over a effect reads at 3.7:1 at its worst tenth (needs 4.5:1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
+    "fix": "put the text on a calm part of the picture, or on a solid panel",
+    "widths": [
+     390
+    ],
+    "from": "consistency",
+    "ids": [
+     "contrast"
+    ],
+    "wheres": [
+     "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+    ]
+   }
+  ],
+  "warns": [
+   {
+    "check": "assets",
+    "where": "(the page)",
+    "msg": "the data file data/bench.json did not load (404)",
+    "fix": "fix the path, or remove the reference",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav",
+    "where": "header.nav > div.wrap.nav__bar > a.nav__logo \"P Parapet\"",
+    "msg": "the nav is lopsided: its first item starts 7px inside the content's edge (80px), while its last ends on the other edge",
+    "fix": "start the nav's first item and end its last on the content's two edges",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "copy-actions",
+    "where": "(the page)",
+    "msg": "the main action \"Open the live dashboard\" does not read word for word the same in the nav or hero and the closing section",
+    "fix": "few actions, one wording: at most 2 in the hero, the main action word for word in nav, hero and close",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "text-contrast",
+    "where": "div.ui-win__main > ul.ui-win__rows > li.ui-win__row:nth-of-type(1) > span.ui-win__st \"Rescued\"",
+    "msg": "12 lines of text in drawn mocks read under 4.5:1 (1 colour pair), the worst \"Rescued\" in #848484 on #ffffff at 3.74:1",
+    "fix": "lift the mocks' muted text (labels, meta, initials) to 4.5:1 on their own panel, or set it larger",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "section-gaps",
+    "where": "main#top > section.hero.hero--triptych / section#live",
+    "msg": "222px between these sections, -26% against the median 300px",
+    "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "section-gaps",
+    "where": "section#speed / section#fees",
+    "msg": "uneven space at the edge of a band: 117px outside its edge, 220px inside it (the space on either side of a change of ground reads as one gap only when the two match)",
+    "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     1440,
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "header.nav > div.wrap.nav__bar > a.nav__logo \"P Parapet\"",
+    "msg": "\"P Parapet\" opens a section headed \"Liquidation shield for Aave loans\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "div.wrap.nav__bar > nav.nav__links > div.nav__item:nth-of-type(1) > a.nav__link \"Product\"",
+    "msg": "\"Product\" opens a section headed \"Parapet's rescue loop, from price event to callbac\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "div.wrap.nav__bar > nav.nav__links > div.nav__item:nth-of-type(3) > a.nav__link \"Speed\"",
+    "msg": "\"Speed\" opens a section headed \"Parapet's rescue latency, measured on testnets\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "stranded-action",
+    "where": "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\"",
+    "msg": "stands 750px across from the nearest text of its block (\"Liquidation shield for Aave lo\")",
+    "fix": "put the button under or beside the text it belongs to",
+    "widths": [
+     1440,
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-current",
+    "where": "header.nav",
+    "msg": "the nav stays on screen with 4 links to the page's sections, but never marks the one you are in (no link changes as the page scrolls)",
+    "fix": "mark the link of the section on screen (a colour, a weight or a line under it) as the visitor scrolls",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "action-repeat",
+    "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"see the live shield\"",
+    "msg": "\"see the live shield\" shows 2 times on the first screen at 1440px (nav, hero): the nav's button and the hero's; nothing else on the screen may repeat it",
+    "fix": "show the action once a screen besides the nav's button: the hero's, the close's or the phone bar's, never all at once",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "section-gaps",
+    "where": "section#how / section#speed",
+    "msg": "uneven space at the edge of a band: 48px outside its edge, 94px inside it (the space on either side of a change of ground reads as one gap only when the two match)",
+    "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "section-gaps",
+    "where": "section#fees / footer#contact",
+    "msg": "uneven space at the edge of a band: 48px outside its edge, 94px inside it (the space on either side of a change of ground reads as one gap only when the two match)",
+    "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   }
+  ],
+  "crashed": [],
+  "seconds": {
+   "consistency": 101,
+   "layout": 6
+  }
+ },
+ "open": [
+  {
+   "check": "section-air",
+   "where": "section#speed / section#fees",
+   "msg": "637px of air between the content of these two sections: 128-480px (64-600px WARN) (SR-3)",
+   "fix": "keep 128-480px of air between the content of neighbouring sections (112-420px on a phone): the sections' padding (--padt, --padb)",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "section-air"
+   ],
+   "wheres": [
+    "section#speed / section#fees"
+   ]
+  }
+ ],
+ "waived": [
+  {
+   "check": "button-styles",
+   "where": "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\"",
+   "msg": "one button style (soft, fill #232323) in 2 heights: 44, 64px (\"See the live shield\" 64px, \"See the live shield\" 44px)",
+   "fix": "one primary and one secondary button: one shape, one height per size, one label size",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "button-styles"
+   ],
+   "wheres": [
+    "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\""
+   ],
+   "reason": "The dealt triptych hero's own recipe (layout.css 9) sets its one large 64px button; the nav and close keep the standard height."
+  },
+  {
+   "check": "same-action",
+   "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\"",
+   "msg": "\"See the live shield\" appears 3 times in different looks: 44px and 64px tall, labels at 16px and 20px",
+   "fix": "draw one action the same way everywhere (only the nav copy may be one size smaller)",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "same-action"
+   ],
+   "wheres": [
+    "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\""
+   ],
+   "reason": "Same cause: the triptych hero's large button is the kit's design, the action and its wording are identical everywhere."
+  },
+  {
+   "check": "off-grid",
+   "where": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\"",
+   "msg": "left edge at 103.5px, 23.5px off the page margin at 80px (23 elements, like span.mark.mark--initial)",
+   "fix": "move it onto the page margin, or the column edge its section uses",
+   "widths": [
+    1440,
+    390
+   ],
+   "from": "consistency",
+   "ids": [
+    "off-grid"
+   ],
+   "wheres": [
+    "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\""
+   ],
+   "reason": "footer--statement is the kit's inset slab (system.css insets it and pads its content); the logo sits on that slab's own wrap."
+  },
+  {
+   "check": "cut-text",
+   "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
+   "msg": "runs past the edge of its box div.panel > div.dg > div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
+   "fix": "give the text room: no overflow clipping a line, no line past its box",
+   "widths": [
+    390
+   ],
+   "from": "consistency",
+   "ids": [
+    "cut-text"
+   ],
+   "wheres": [
+    "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+   ],
+   "reason": "The kit's lanes diagram wraps short tile captions under each node at 390; the 390 screenshot shows every label whole."
+  },
+  {
+   "check": "contrast",
+   "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
+   "msg": "body text over a effect reads at 3.7:1 at its worst tenth (needs 4.5:1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
+   "fix": "put the text on a calm part of the picture, or on a solid panel",
+   "widths": [
+    390
+   ],
+   "from": "consistency",
+   "ids": [
+    "contrast"
+   ],
+   "wheres": [
+    "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+   ],
+   "reason": "Captions sit on the kit's lit sky ground beside the node tiles; the screenshot reads clearly and the ground is the kit's own."
+  }
+ ],
+ "warnCount": 14,
+ "at": "2026-11-21T17:23:45.235Z",
+ "openTold": true
+}
