@@ -145,7 +145,7 @@
               <a href="#fees">Fees<span>Fees against gas paid</span></a>
             </div>
             <a class="menu-card span-3 start-10" href="#speed">
-              <div class="panel"><div class="ledger"><p class="ledger__x" data-live="median">1.4 s</p><p class="pos__note">Median from price drop to rescue</p></div></div>
+              <div class="panel"><div class="ledger"><p class="ledger__x" data-live="median">1.2 s</p><p class="pos__note">Median from price drop to rescue</p></div></div>
               <span class="t-card">Benchmark results</span>
               <span class="t-small muted">Every round with its two transactions</span>
             </a>
@@ -170,7 +170,7 @@
     <div class="wrap"><div class="hero-text grid hero__grid">
       <div class="span-3">
         <h1 id="hero-h">Liquidation shield for Aave loans</h1>
-        <p class="hero__lead">When the price drops, Parapet adds collateral to your loan in about 1.4 seconds, with no keeper bot, and keeps 0.3% as its fee.</p>
+        <p class="hero__lead">When the price drops, Parapet adds collateral to your loan in about 1.2 seconds, with no keeper bot, and keeps 0.3% as its fee.</p>
       </div>
       <div class="ly-collage span-6 start-4" role="img" aria-label="Cards from a live rescue: WETH falls to 1,800 dollars, the health factor drops to 1.08, and the shield lifts it back to 1.40 seven blocks later">
         <div class="ly-collage__set is-on">
@@ -183,8 +183,8 @@
           <div class="ly-piece" style="left: 40%; top: 50%; width: 56%"><span class="pc-lbl">Loop</span><div class="pc-row"><span>Oracle event</span><span class="pc-mono">Base</span></div><div class="pc-row"><span>ShieldReactive</span><span class="pc-mono">Lasna</span></div><div class="pc-row"><span>rescue()</span><span class="pc-mono">Base</span></div></div>
         </div>
         <div class="ly-collage__set" aria-hidden="true">
-          <div class="ly-piece pc-dark" style="left: 4%; top: 10%; width: 54%"><span class="pc-lbl">Fees earned</span><span class="pc-big">0.0002 ETH</span><span class="pc-mono">from 2 rescues</span></div>
-          <div class="ly-piece" style="left: 42%; top: 52%; width: 54%"><span class="pc-lbl">Callback gas paid</span><span class="pc-big">0.000003</span><span class="pc-mono">ETH, out of fee income</span></div>
+          <div class="ly-piece pc-dark" style="left: 4%; top: 10%; width: 54%"><span class="pc-lbl">Fees earned</span><span class="pc-big">0.0023 ETH</span><span class="pc-mono">from 23 rescues</span></div>
+          <div class="ly-piece" style="left: 42%; top: 52%; width: 54%"><span class="pc-lbl">Callback gas paid</span><span class="pc-big">0.00003</span><span class="pc-mono">ETH, out of fee income</span></div>
         </div>
       </div>
       <div class="span-3 start-10 hero__cta"><a class="btn btn--primary" href="#live">See the live shield</a></div>
@@ -277,7 +277,7 @@
         <div class="span-6 stack-4">
           <h2 id="speed-h">Parapet's rescue latency, measured on testnets</h2>
           <p>Each round resets the loan, drops WETH from $2,000 to $1,800 and counts Base blocks from the price event to the rescue. Base Sepolia makes a block every 200 ms.</p>
-          <p class="t-stat" data-live="median-big">1.4 s</p>
+          <p class="t-stat" data-live="median-big">1.2 s</p>
           <p class="t-small muted" data-live="summary">Median of the measured rounds</p>
         </div>
         <div class="span-6 start-7">
@@ -298,14 +298,14 @@
       <div class="grid">
         <div class="span-6 stack-4">
           <h2 id="fees-h">Parapet's fees pay its callback gas</h2>
-          <p>Every fee is unwrapped to ETH inside the shield, and the callback proxy takes its gas from that balance. The ledger is read from the contract.</p>
+          <p>Every fee is unwrapped to ETH inside the shield, and the callback proxy takes its gas from that balance. Execution on Lasna, about 0.04 lREACT a rescue, is still funded by hand.</p>
           <p>Everything runs on Base Sepolia and Reactive Lasna testnets with test tokens. The pool copies Aave V3's function names and health factor maths so the demo can move the price.</p>
           <a class="link" href="https://base-sepolia.blockscout.com/address/0x3796897b27240f329b32184f2C2cBd6666A1EeaE">Open the shield on Blockscout</a>
         </div>
         <div class="span-6 start-7">
           <div class="panel"><div class="ui ui-panel ledger">
             <span class="pos__note">Fees earned for each wei of callback gas</span>
-            <p class="ledger__x" data-live="ratio">67×</p>
+            <p class="ledger__x" data-live="ratio">75×</p>
             <div class="ledger__row"><span>Fees earned</span><strong data-live="fees">0.000200 ETH</strong><div class="ledger__bar"><i style="width:100%"></i></div></div>
             <div class="ledger__row"><span>Callback gas paid</span><strong data-live="gas">0.000003 ETH</strong><div class="ledger__bar"><i class="gas" data-live="gasbar" style="width:2%"></i></div></div>
             <div class="ledger__row"><span>Seed sent at deploy</span><strong data-live="seed">0.002000 ETH</strong></div>
