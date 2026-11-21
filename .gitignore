@@ -1,0 +1,8 @@
+.env
+out/
+cache/
+broadcast/*/dry-run/
+node_modules/
+dashboard/shots/
+dashboard/.taste-skill/chrome-*/
+dashboard/.taste-skill/gate/
