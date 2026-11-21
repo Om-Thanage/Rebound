@@ -83,18 +83,18 @@
     .app > .app__pane + .app__pane { border-top: 0; }
   }
   /* the open position: the shield's live view of one loan */
-  .pos { padding: 24px; display: grid; gap: 20px; font-family: var(--font-text); color: var(--u-ink, var(--p-ink)); }
+  .pos { padding: 20px 24px; display: grid; gap: 14px; font-family: var(--font-text); color: var(--u-ink, var(--p-ink)); }
   .pos__head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
   .pos__who { font-family: var(--font-mono); font-size: 13px; color: var(--p-muted); }
-  .pos__hf { font: 400 64px/1 var(--font-display); letter-spacing: -0.04em; }
+  .pos__hf { font: 400 48px/1 var(--font-display); letter-spacing: -0.04em; }
   .pos__gauge { height: 10px; background: var(--p-surface); position: relative; }
   .pos__gauge i { position: absolute; inset: 0 auto 0 0; background: var(--p-ink); transition: width .6s; }
   .pos__gauge b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #c2410c; }
   .pos__gauge b.t { background: #1f6b3a; }
   .pos__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-  .pos__cell { border: 1px solid var(--u-line); padding: 12px; display: grid; gap: 4px; }
+  .pos__cell { border: 1px solid var(--u-line); padding: 8px 12px; display: grid; gap: 2px; }
   .pos__cell span { font-size: 13px; color: var(--p-muted); }
-  .pos__cell strong { font: 500 18px/1.2 var(--font-mono); }
+  .pos__cell strong { font: 500 16px/1.2 var(--font-mono); }
   .pos__note { font-size: 13px; color: var(--p-muted); }
   @media (max-width: 639px) { .pos__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pos__hf { font-size: 48px; } }
 
@@ -106,6 +106,9 @@
   .ledger__bar i { position: absolute; inset: 0 auto 0 0; background: var(--p-ink); }
   .ledger__bar i.gas { background: #c2410c; }
   .ledger__x { font: 400 56px/1 var(--font-display); letter-spacing: -0.04em; }
+  /* the loan window never shrinks below what its panes need; on a short screen the section grows instead of hiding it */
+  #live { height: auto; min-height: calc(var(--h, 1) * 100svh); }
+  #live .app.ui { flex: 1 0 0; min-height: 520px; }
   #fees .panel { --p-h: 560px; }
   #how .panel { --p-h: 480px; }
   @media (max-width: 639px) { #fees .panel { --p-h: 360px; } #how .panel { --p-h: 380px; } }
@@ -209,7 +212,7 @@
   <section class="section" id="live" style="--hm: 2" aria-labelledby="live-h">
     <div class="wrap">
       <div class="grid">
-        <h2 id="live-h" class="span-5">A demo loan you can crash, read live from Base Sepolia</h2>
+        <h2 id="live-h" class="span-5">A demo loan you can crash</h2>
         <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
       </div>
       <ol class="steps" data-steps aria-label="What one run does">
