@@ -1,0 +1,1 @@
+rounds 20 | median 1.2s | p90 1.6s | min 1.0s | max 2.0s | mean 1.35s

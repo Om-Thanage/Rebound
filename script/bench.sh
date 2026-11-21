@@ -10,6 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 set -a; . ./.env; . ./deployments.env; set +a
 ROUNDS=${1:-20}
+START=${START:-1} # first round number, to continue an earlier run
 B="--rpc-url $BASE_SEPOLIA_RPC --private-key $PRIVATE_KEY"
 R="--rpc-url $REACTIVE_LASNA_RPC"
 OUT=results/bench.csv
@@ -29,7 +30,7 @@ logs() { # chain-rpc from to address topic -> first matching log as compact JSON
     | jq -c '(if type == "object" then .data else . end) | if type == "array" then (.[0] // empty) else empty end' 2>/dev/null || true
 }
 
-for round in $(seq 1 "$ROUNDS"); do
+for round in $(seq "$START" $((START + ROUNDS - 1))); do
   # ---- reset to the same starting position
   send "$ORACLE" "setAssetPrice(address,uint256)" "$WETH" 200000000000
   extra=$(( $(coll) - BASE_COLL ))

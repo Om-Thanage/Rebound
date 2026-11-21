@@ -1,0 +1,231 @@
+{
+  "summary": {
+    "rounds": 20,
+    "median": 1.2,
+    "p90": 1.6,
+    "min": 1,
+    "max": 2
+  },
+  "rows": [
+    {
+      "round": 1,
+      "priceTx": "0x5bbf98b69e2fe28af4a3f649fde6faeb93f2f1eeba1d6aac8bec14f637dd50e4",
+      "priceBlock": 61792756,
+      "rescueTx": "0x218ef162191983380042e22a77b598c64210cef61d9e36cb5e761690e69ec0e0",
+      "rescueBlock": 61792762,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 2,
+      "priceTx": "0x64f2a78767c09601372901756d16dd9fe6144e41c38d38d3f30ac2b160aa3780",
+      "priceBlock": 61793117,
+      "rescueTx": "0xea213fa975d061c74dd1f871d94f0e5b5c2e3b7fe8777f2f1c17713fcb708614",
+      "rescueBlock": 61793122,
+      "blocks": 5,
+      "seconds": 1,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 3,
+      "priceTx": "0x25859c8af81fb04182075e317af33e7a8c5b2cd4cf9bfcbaf96c44999ab05b33",
+      "priceBlock": 61793449,
+      "rescueTx": "0x25918ebd0eacffacacb03262c92459b073968f5662c25c509034f49d6e8627e8",
+      "rescueBlock": 61793455,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 4,
+      "priceTx": "0x59ebf546a2618ea2f97e484ba922b1b77cc01d867795a29a1172c0d37770b1ab",
+      "priceBlock": 61793784,
+      "rescueTx": "0xd9a78e42a19ff4445bb87db02a4fa768b98023ae8b8361b6ee15598ddb1ff562",
+      "rescueBlock": 61793791,
+      "blocks": 7,
+      "seconds": 1.4,
+      "toReactive": 0,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 5,
+      "priceTx": "0x5e21e1ceeec5a94d1f5dc44002d46857341c803ffa48cc1275840654c5b096f0",
+      "priceBlock": 61796523,
+      "rescueTx": "0xfaec135e67fa764f16e64e2a820953fc75f403d53a56b5275079d6b3a82c9600",
+      "rescueBlock": 61796531,
+      "blocks": 8,
+      "seconds": 1.6,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 6,
+      "priceTx": "0x1f83dc8eee346055053ec1441159beabeebefac3e65ade1d417b3f1fa3451175",
+      "priceBlock": 61797057,
+      "rescueTx": "0x74a2ba3bcc9e60dd2554785c54ce2bad97c2985e7e56f0e0842daa1e1c739e75",
+      "rescueBlock": 61797062,
+      "blocks": 5,
+      "seconds": 1,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 7,
+      "priceTx": "0xa12d0ceb1748a8d24f1c71203e77d10cc43cb317ab7a9d9558d1946013940620",
+      "priceBlock": 61797397,
+      "rescueTx": "0x56099f46e86cc15fc6ec8dc233584fc3185f1e5eaf6702b725d4636a1268c76f",
+      "rescueBlock": 61797407,
+      "blocks": 10,
+      "seconds": 2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 8,
+      "priceTx": "0x90f0755bd4b8705983471d5a00f95e31798a5a0821fdaca8e6617c655fc36163",
+      "priceBlock": 61797748,
+      "rescueTx": "0x8bb06183118b8a96d3327881d6fb223d01c70f46b4c2086f19f3189ce6535c8f",
+      "rescueBlock": 61797758,
+      "blocks": 10,
+      "seconds": 2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 9,
+      "priceTx": "0x1b61ddad0a12dcfdd765739bd8395c45f2772ee759cdacad50ef903357bc3d33",
+      "priceBlock": 61798083,
+      "rescueTx": "0xb47b88bb61881062dbea490249e08f7554120efb0950992e1c3cd7d5776e6e07",
+      "rescueBlock": 61798091,
+      "blocks": 8,
+      "seconds": 1.6,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 10,
+      "priceTx": "0xd7b8ebd4ceb4c96081eab257d895012048842e9fd3351b76287ac7bd624c6c28",
+      "priceBlock": 61798415,
+      "rescueTx": "0x37c88da97a183eea50867d6b90915bf80ad03e635eef9d00444d2ffcec2baada",
+      "rescueBlock": 61798423,
+      "blocks": 8,
+      "seconds": 1.6,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 11,
+      "priceTx": "0x91eb8d4f12c92b52c4cefc2aca83a9be890bc2d0f1995e592f7b88448c96e333",
+      "priceBlock": 61798749,
+      "rescueTx": "0xd30520e8d34768fd073ae2079b5ddb6cac886ec0abe5300fbc27d4d78c6a83e9",
+      "rescueBlock": 61798754,
+      "blocks": 5,
+      "seconds": 1,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 12,
+      "priceTx": "0xe4a4c75c15829faec639fb09dcdd174ed25689f7aeb7cac5614402a40c7d0602",
+      "priceBlock": 61799088,
+      "rescueTx": "0x79f57a51b7830f0faa97ea1a5aae11c30bc498fe1242ae165ad20fb2bede62c6",
+      "rescueBlock": 61799093,
+      "blocks": 5,
+      "seconds": 1,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 13,
+      "priceTx": "0xcbd88c1f4b797e42b1b63d51f68ccfc22af07a312bce3dc9d1c2ddf49c21bbf6",
+      "priceBlock": 61799435,
+      "rescueTx": "0xc9c006b8a34e36c530ce150b0f6e567905b07428a69ed7bd8464883115318c90",
+      "rescueBlock": 61799442,
+      "blocks": 7,
+      "seconds": 1.4,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 14,
+      "priceTx": "0xeaf4e773a68fc22c3ee40744e5f5b9842bbf8f97fd18e71e1bd440bd16889887",
+      "priceBlock": 61799773,
+      "rescueTx": "0xf101de56b040677b8a4bea39d7e22a56b2a967f77ef440a7582b9fe68c77e471",
+      "rescueBlock": 61799779,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 15,
+      "priceTx": "0xc8c57e028d1b43a9becce66089e694926c83874cd5c3964a99c9f4275877340c",
+      "priceBlock": 61800101,
+      "rescueTx": "0x421410e598cf4228f7acfe5793dd797a7ff391de119477b12e27af36317150dc",
+      "rescueBlock": 61800107,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 16,
+      "priceTx": "0x80feb0b78f410d1eab8819c93efc90595e8f783f2fc02827e9a2b0359696cfc1",
+      "priceBlock": 61800436,
+      "rescueTx": "0xc56606b6b00258d0ae43ff2ff04ad432f52193affd8bed55ff6b91ebdffa4c1d",
+      "rescueBlock": 61800442,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 17,
+      "priceTx": "0xb89bc87e5df885902fae9dbc0f45d02b7d04fd01357a13ae35b20d3cc7141f53",
+      "priceBlock": 61800770,
+      "rescueTx": "0x5c9b69f8326d25e22e90cc4baa77c98abf540797f0090c570bf87ea0505fa979",
+      "rescueBlock": 61800776,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 18,
+      "priceTx": "0x1bc8ec6d2230b5f48f6159095af78dcd69016288c0840e1f843bb69655470f13",
+      "priceBlock": 61803582,
+      "rescueTx": "0xa98a33b9c021f69d1a3c5ce54e9e8466d00db57fefe37dd110d10d6d67e53f95",
+      "rescueBlock": 61803590,
+      "blocks": 8,
+      "seconds": 1.6,
+      "toReactive": 0,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 19,
+      "priceTx": "0xd30bbd75fc689e41cbae9755ee9d9cc39427301037b56bfb4cb258b5bd850cfe",
+      "priceBlock": 61804500,
+      "rescueTx": "0xc0b1473072c2b4168bd3e7b4a291acf5bb3a5c7f2a793c657a5c0ae2185de288",
+      "rescueBlock": 61804507,
+      "blocks": 7,
+      "seconds": 1.4,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    },
+    {
+      "round": 20,
+      "priceTx": "0x9ec093e044b6d32d55bdd237cef522f7e5066595ccda1a9e62e378ee1e537da9",
+      "priceBlock": 61804831,
+      "rescueTx": "0xb57038c29bf982924f9696bb9a036a6d86af697071b3368db094d75d45283ae8",
+      "rescueBlock": 61804837,
+      "blocks": 6,
+      "seconds": 1.2,
+      "toReactive": null,
+      "hfAfter": "1400000002500000000"
+    }
+  ]
+}
