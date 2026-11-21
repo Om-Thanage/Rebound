@@ -104,12 +104,18 @@ Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`. So
 
 ### Full-loop transactions (origin event → callback)
 
-| Price event (Base) | Rescue callback (Base) | Blocks |
-|---|---|---|
-| [`0xf6f1…a0a1`](https://base-sepolia.blockscout.com/tx/0xf6f1125010fd6c7a747a805c6ffcfb2213528ccaae164375cc3b1d57bbf5a0a1) | [`0x1bc3…184c`](https://base-sepolia.blockscout.com/tx/0x1bc3e1a0e08e9823e6b3ec988a00d0cddfc0b1b75fe74fc9e82d89750e8f184c) | 10 (2.0 s) |
-| [`0xc11e…bf5c`](https://base-sepolia.blockscout.com/tx/0xc11e446208d96d23c5269fb41a6ee02926fc79131bdf6482d4ea7a8b3f41bf5c) | [`0x9ce1…4595`](https://base-sepolia.blockscout.com/tx/0x9ce10614e20ef705b748d1e2f604d406e3d1bbb9868a5a7ae7c6d6a4a1b44595) | 7 (1.4 s) |
+| Loop | 1. Price event (Base) | 2. Reactive tx, `RescueRequested` (Lasna) | 3. Rescue callback (Base) | Base blocks |
+|---|---|---|---|---|
+| First demo | [`0xf6f1…a0a1`](https://base-sepolia.blockscout.com/tx/0xf6f1125010fd6c7a747a805c6ffcfb2213528ccaae164375cc3b1d57bbf5a0a1) | [`0x6020…31e8`](https://lasna.reactscan.net/tx/0x60208ef509b0422ba7f391a0ca7afe31105f97f17d9d7012bf9803bfa00d31e8) | [`0x1bc3…184c`](https://base-sepolia.blockscout.com/tx/0x1bc3e1a0e08e9823e6b3ec988a00d0cddfc0b1b75fe74fc9e82d89750e8f184c) | 10 (2.0 s) |
+| Second demo | [`0xc11e…bf5c`](https://base-sepolia.blockscout.com/tx/0xc11e446208d96d23c5269fb41a6ee02926fc79131bdf6482d4ea7a8b3f41bf5c) | [`0x623c…1d19`](https://lasna.reactscan.net/tx/0x623c91ab32597e1639392160e76dc536aa5f30156ed98d5bf4ab860619341d19) | [`0x9ce1…4595`](https://base-sepolia.blockscout.com/tx/0x9ce10614e20ef705b748d1e2f604d406e3d1bbb9868a5a7ae7c6d6a4a1b44595) | 7 (1.4 s) |
+| First `DemoLoan.run()` | [`0x76b6…77ab`](https://base-sepolia.blockscout.com/tx/0x76b6fcfae1e3420008758f92a8cc1d972cc7ac0a4083821ca3c36c3dc77877ab) | [`0x21cd…a413`](https://lasna.reactscan.net/tx/0x21cd56036006de8889f7fa787347620f10e852f14a2beccf5241a622e3bfa413) | [`0xb1b4…0056`](https://base-sepolia.blockscout.com/tx/0xb1b4cf4a96a58c32ed501b2760a73c5fb00c0b84d70df3f1628b3a99c2830056) | 7 (1.4 s) |
 
-Every benchmark round adds a pair; see `results/bench.csv`.
+Every rescue so far has its own `RescueRequested` transaction on Lasna: see ShieldReactive's
+[transaction list on reactscan](https://lasna.reactscan.net/address/0x2C7AD06885D413E1dCd9CEa886467D1Bc8f234c4).
+Every benchmark round's price and rescue pair is in `results/bench.csv`.
+
+All seven contracts are source-verified (exact match on Sourcify; the Base ones also show their Solidity on
+Blockscout), so the links above open readable code.
 
 ## Run it yourself
 
