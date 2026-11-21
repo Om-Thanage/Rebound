@@ -110,6 +110,8 @@
   #how .panel { --p-h: 480px; }
   @media (max-width: 639px) { #fees .panel { --p-h: 360px; } #how .panel { --p-h: 380px; } }
   .rows__value a, .tx { font-family: var(--font-mono); }
+  .run-status { font-size: var(--t-body); min-height: 3em; }
+  .run-status a { font-family: var(--font-mono); }
   .fee-compare { margin-top: var(--s-8); }
   .bars { padding: 24px; display: grid; gap: 16px; align-content: start; height: 100%; font-family: var(--font-text); }
   .bars__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -157,7 +159,7 @@
       <div class="nav__item"><a class="nav__link" href="#fees">Fees</a></div>
           </nav>
     <div class="nav__actions">
-      <a class="btn btn--primary" href="#live">See the live shield</a>
+      <a class="btn btn--primary" href="#live" data-run>Run a rescue</a>
     </div>
     <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -187,15 +189,15 @@
           <div class="ly-piece" style="left: 42%; top: 52%; width: 54%"><span class="pc-lbl">Callback gas paid</span><span class="pc-big">0.00003</span><span class="pc-mono">ETH, out of fee income</span></div>
         </div>
       </div>
-      <div class="span-3 start-10 hero__cta"><a class="btn btn--primary" href="#live">See the live shield</a></div>
+      <div class="span-3 start-10 hero__cta"><a class="btn btn--primary" href="#live" data-run>Run a rescue</a></div>
     </div></div>
   </section>
 
   <section class="section" id="live" aria-labelledby="live-h">
     <div class="wrap">
       <div class="grid">
-        <h2 id="live-h" class="span-5">One protected loan, read live from Base Sepolia</h2>
-        <p class="span-6 start-7">The list shows every rescue the shield has made. The loan on the right is read from the pool and the shield every 10 seconds. <a class="link" href="#speed">See the benchmark</a></p>
+        <h2 id="live-h" class="span-5">A demo loan you can crash, read live from Base Sepolia</h2>
+        <div class="span-6 start-7 stack-2"><p>Run a rescue drops WETH from $2,000 to $1,800 on Base Sepolia from your wallet. Watch the demo loan on the right fall under its trigger and come back to 1.40 within seconds.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
       </div>
       <div class="ui app fill" role="img" aria-label="Rescue history beside the protected loan's health factor, collateral, debt, reserve and WETH price" data-ui-pause-host>
         <div class="app__pane app__pane--list">
@@ -225,7 +227,7 @@
         </div>
         <div class="app__pane app__pane--open">
           <div class="ui ui-panel pos">
-            <div class="pos__head"><span class="pos__who" data-live="who">Loan 0x312D…5fcD</span><span class="pos__note" data-live="updated">Reading the chain</span></div>
+            <div class="pos__head"><span class="pos__who" data-live="who">Demo loan 0x0d3d…2BdF</span><span class="pos__note" data-live="updated">Reading the chain</span></div>
             <div><span class="pos__note">Health factor</span><p class="pos__hf" data-live="hf">1.40</p></div>
             <div class="pos__gauge" aria-hidden="true"><i data-live="gauge" style="width:56%"></i><b style="left:43%"></b><b class="t" style="left:60%"></b></div>
             <div class="pos__grid">
@@ -321,8 +323,8 @@
   <div class="wrap">
     <div class="closing__cta close--word">
       <div class="section-head--split">
-        <div><h2 id="close-h">Watch the next rescue land</h2><p class="t-lead">The loan above refreshes every 10 seconds.</p></div>
-        <a class="btn btn--primary" href="#live">See the live shield<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
+        <div><h2 id="close-h">Crash the price and watch the rescue</h2><p class="t-lead">One wallet transaction on Base Sepolia, one run a minute.</p></div>
+        <a class="btn btn--primary" href="#live" data-run>Run a rescue<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
       </div>
       <p class="close__word" aria-hidden="true">Parapet</p>
     </div>
