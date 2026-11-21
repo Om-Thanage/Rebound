@@ -110,7 +110,20 @@
   #how .panel { --p-h: 480px; }
   @media (max-width: 639px) { #fees .panel { --p-h: 360px; } #how .panel { --p-h: 380px; } }
   .rows__value a, .tx { font-family: var(--font-mono); }
-  .run-status { font-size: var(--t-body); min-height: 3em; }
+  .run-status { font-size: var(--t-body); min-height: 1.5em; }
+  .steps { list-style: none; margin: var(--s-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-3); }
+  .steps li { display: grid; grid-template-columns: 28px 1fr; column-gap: var(--s-2); align-content: start; padding-top: var(--s-3); border-top: 2px solid rgb(35 35 35 / .14); }
+  .steps__n { grid-row: span 2; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid rgb(35 35 35 / .3); font: 500 13px/1 var(--font-mono); }
+  .steps__t { font-weight: 500; font-size: 15px; line-height: 1.3; }
+  .steps__d { font-size: 13px; line-height: 1.4; color: var(--p-muted); }
+  .steps__d a { font-family: var(--font-mono); color: var(--p-ink); }
+  .steps li[data-state="now"] { border-top-color: var(--p-ink); }
+  .steps li[data-state="now"] .steps__n { background: var(--p-ink); color: #fff; border-color: var(--p-ink); }
+  .steps li[data-state="done"] { border-top-color: #1f6b3a; }
+  .steps li[data-state="done"] .steps__n { background: var(--p-accent); border-color: #1f6b3a; }
+  .steps li[data-state="fail"] { border-top-color: #c2410c; }
+  .steps li[data-state="fail"] .steps__n { background: #c2410c; color: #fff; border-color: #c2410c; }
+  @media (max-width: 1023px) { .steps { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); } .steps li { padding-top: var(--s-2); } }
   .run-status a { font-family: var(--font-mono); }
   .fee-compare { margin-top: var(--s-8); }
   .bars { padding: 24px; display: grid; gap: 16px; align-content: start; height: 100%; font-family: var(--font-text); }
@@ -193,12 +206,19 @@
     </div></div>
   </section>
 
-  <section class="section" id="live" aria-labelledby="live-h">
+  <section class="section" id="live" style="--hm: 2" aria-labelledby="live-h">
     <div class="wrap">
       <div class="grid">
         <h2 id="live-h" class="span-5">A demo loan you can crash, read live from Base Sepolia</h2>
-        <div class="span-6 start-7 stack-2"><p>Run a rescue drops WETH from $2,000 to $1,800 on Base Sepolia from your wallet. Watch the demo loan on the right fall under its trigger and come back to 1.40 within seconds.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
+        <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
       </div>
+      <ol class="steps" data-steps aria-label="What one run does">
+        <li data-step="1" data-state="wait"><span class="steps__n">1</span><span class="steps__t">Connect your wallet</span><span class="steps__d" data-step-detail>On Base Sepolia, the test network</span></li>
+        <li data-step="2" data-state="wait"><span class="steps__n">2</span><span class="steps__t">Confirm one transaction</span><span class="steps__d" data-step-detail>Resets the loan at $2,000, then drops WETH to $1,800</span></li>
+        <li data-step="3" data-state="wait"><span class="steps__n">3</span><span class="steps__t">Loan falls under its trigger</span><span class="steps__d" data-step-detail>Health factor 1.20 to 1.08 on Base; trigger is 1.15</span></li>
+        <li data-step="4" data-state="wait"><span class="steps__n">4</span><span class="steps__t">Reactive Network reacts</span><span class="steps__d" data-step-detail>ShieldReactive on Lasna sees the price and asks for a rescue</span></li>
+        <li data-step="5" data-state="wait"><span class="steps__n">5</span><span class="steps__t">Shield rescues the loan</span><span class="steps__d" data-step-detail>Adds collateral on Base until the health factor is 1.40</span></li>
+      </ol>
       <div class="ui app fill" role="img" aria-label="Rescue history beside the protected loan's health factor, collateral, debt, reserve and WETH price" data-ui-pause-host>
         <div class="app__pane app__pane--list">
           <div class="ui ui-panel ui-win" data-ui="window" data-open="Rescued" data-work="Pending" data-done="Rescued">
@@ -323,7 +343,7 @@
   <div class="wrap">
     <div class="closing__cta close--word">
       <div class="section-head--split">
-        <div><h2 id="close-h">Crash the price and watch the rescue</h2><p class="t-lead">One wallet transaction on Base Sepolia, one run a minute.</p></div>
+        <div><h2 id="close-h">Crash the price and watch the rescue</h2><p class="t-lead">One wallet transaction on Base Sepolia; the rest of the loop runs on its own.</p></div>
         <a class="btn btn--primary" href="#live" data-run>Run a rescue<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
       </div>
       <p class="close__word" aria-hidden="true">Parapet</p>
