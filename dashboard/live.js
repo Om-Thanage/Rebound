@@ -136,6 +136,8 @@ async function readReactive() {
 }
 
 async function readRescues() {
+  document.querySelectorAll('[data-live-href="shield"]').forEach((a) => { a.href = `${SCOUT}/address/${A.shield}`; });
+  document.querySelectorAll('[data-live-href="reactive"]').forEach((a) => { a.href = `${LASNA_SCAN}/address/${REACTIVE}`; });
   // history ships with the site (data/rescues.json, script/export-rescues.mjs); newer rescues come straight from an
   // RPC that accepts wide eth_getLogs ranges. No Blockscout here: its free API rate-limits visitors (HTTP 429).
   const hist = await fetch('data/rescues.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -165,6 +167,7 @@ async function readRescues() {
     const mins = Math.max(0, Math.round((Date.now() / 1000 - Number(ts)) / 60));
     const li = document.createElement('li');
     li.className = 'ui-win__row';
+    li.dataset.loan = isDemo ? 'demo' : 'bench';
     li.innerHTML = `<span class="ui-avatar" data-tone="${isDemo ? 2 : 1}">${isDemo ? 'D' : 'B'}</span><span class="ui-win__who"><span></span><a target="_blank" rel="noopener"></a></span><span class="ui-win__sub"></span><span class="ui-win__age"></span>`;
     li.children[1].firstChild.textContent = isDemo ? 'Demo loan' : 'Benchmark loan';
     li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)} · HF ${hf(before)} → ${hf(after)}`;
@@ -175,7 +178,28 @@ async function readRescues() {
     li.children[3].textContent = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
     return li;
   }));
+  const demoCount = rescues.filter((l) => '0x' + l.topics[1].slice(26) === demo).length;
+  set('count-demo', String(demoCount));
+  set('count-bench', String(rescues.length - demoCount));
+  applyFilter();
 }
+
+// the sidebar's Show buttons filter the rescue list; the choice survives the 10-second refresh
+let rescueFilter = 'all';
+function applyFilter() {
+  document.querySelectorAll('[data-live="rows"] li[data-loan]').forEach((li) => {
+    li.hidden = rescueFilter !== 'all' && li.dataset.loan !== rescueFilter;
+  });
+  document.querySelectorAll('button[data-filter]').forEach((b) => {
+    const on = b.dataset.filter === rescueFilter;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+document.querySelectorAll('button[data-filter]').forEach((b) => b.addEventListener('click', () => {
+  rescueFilter = b.dataset.filter;
+  applyFilter();
+}));
 
 async function readBench() {
   const r = await fetch('data/bench.json', { cache: 'no-store' });

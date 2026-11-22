@@ -122,6 +122,10 @@
   a[href*="/tx/"]:hover { color: var(--p-ink); }
   .ui-win__who a { margin-left: 8px; font-size: 13px; }
   .mode-help { margin: 0; line-height: 1.5; }
+  button.ui-win__nav { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; width: 100%; text-align: left; }
+  a.ui-win__nav { color: inherit; text-decoration: none; cursor: pointer; }
+  button.ui-win__nav:hover, a.ui-win__nav:hover { background: var(--u-fill-2, rgb(35 35 35 / .06)); }
+  a.ui-win__nav:hover { text-decoration: underline; }
   .run-status { font-size: var(--t-body); min-height: 1.5em; }
   .steps { list-style: none; margin: var(--s-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-3); }
   .steps li { display: grid; grid-template-columns: 28px 1fr; column-gap: var(--s-2); align-content: start; padding-top: var(--s-3); border-top: 2px solid rgb(35 35 35 / .14); }
@@ -257,15 +261,15 @@
               <span class="ui-spacer"></span>
             </div>
             <div class="ui-win__body">
-              <nav class="ui-win__side" aria-hidden="true">
-                <span class="ui-win__nav is-on">Rescues<em data-live="count">2</em></span>
-                <span class="ui-win__nav">Loans<em data-live="loans">2</em></span>
-                <span class="ui-win__label">Key</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">D</span>Demo loan</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">B</span>Benchmark</span>
-                <span class="ui-win__label">Chains</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">#</span>Base Sepolia</span>
-                <span class="ui-win__nav"><span class="ui-win__hash">#</span>Lasna</span>
+              <nav class="ui-win__side" aria-label="Filter rescues and open the contracts">
+                <span class="ui-win__label">Show</span>
+                <button type="button" class="ui-win__nav is-on" data-filter="all" aria-pressed="true">All rescues<em data-live="count">…</em></button>
+                <button type="button" class="ui-win__nav" data-filter="demo" aria-pressed="false"><span class="ui-win__hash">D</span>Demo loan<em data-live="count-demo">…</em></button>
+                <button type="button" class="ui-win__nav" data-filter="bench" aria-pressed="false"><span class="ui-win__hash">B</span>Benchmark<em data-live="count-bench">…</em></button>
+                <span class="ui-win__label">Contracts</span>
+                <a class="ui-win__nav" data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc" target="_blank" rel="noopener">Shield, Base ↗</a>
+                <a class="ui-win__nav" data-live-href="reactive" href="https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345" target="_blank" rel="noopener">Reactive, Lasna ↗</a>
+                <span class="ui-win__label">Loans watched: <b data-live="loans">2</b></span>
               </nav>
               <div class="ui-win__main">
                 <div class="ui-win__cols" aria-hidden="true"><span>Loan</span><span>What the rescue did</span><span>Transaction</span><span>When</span></div>
