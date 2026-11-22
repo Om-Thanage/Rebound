@@ -4,14 +4,14 @@ let RPC = 'https://sepolia.base.org';
 const SCOUT = 'https://base-sepolia.blockscout.com';
 let LASNA = 'https://lasna-rpc.rnk.dev/';
 const LASNA_SCAN = 'https://lasna.reactscan.net';
-let REACTIVE = '0x2C7AD06885D413E1dCd9CEa886467D1Bc8f234c4';
+let REACTIVE = '0x49074f7961c01416cf5A57d13df664C32fb33345';
 // Addresses of the live deployment; data/deployment.json (written by script/export-deployment.mjs) overrides them.
 const A = {
-  user: '0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF', // DemoLoan: the loan visitors crash with Run a rescue
-  weth: '0xac1f5822da429129e15aB706D3888769De7d5cF4',
-  oracle: '0x49074f7961c01416cf5A57d13df664C32fb33345',
-  pool: '0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c',
-  shield: '0x3796897b27240f329b32184f2C2cBd6666A1EeaE',
+  user: '0x3673cE1229C43ac7A64a5E85DB58c1320d5E4573', // DemoLoan: the loan visitors crash with Run a rescue
+  weth: '0x8C2A82cC3A5f9d1736c3A5bE0Dd2Ef56e1c37A64',
+  oracle: '0xB567239e6AE5E9b76462dAE4610335e480263b03',
+  pool: '0x7ac6FcF13E42908F78A691B7CaF7Cb55BfD18774',
+  shield: '0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc',
 };
 const SEL = { account: '0xbf92857c', price: '0xb3596f07', prot: '0x613e3fc0', ledger: '0x30b7c49f', collateral: '0xa5fdc5de', debt: '0x9b6c56ec', count: '0x98e78023', run: '0xc0406226', wait: '0xccca123b',
   breakdown: '0x46332ee4', mode: '0x295a5212', runWithMode: '0x6a99d796',
@@ -123,7 +123,8 @@ async function readReactive() {
   const lasna = (sel) => call(REACTIVE, sel, LASNA).then((w) => w[0]);
   const [ticks, checked, requested, early, cron, users] = await Promise.all(
     [SEL.ticks, SEL.checked, SEL.requested, SEL.early, SEL.cron, SEL.users].map(lasna));
-  const bal = BigInt(await rpcAt(LASNA, 'eth_getBalance', [REACTIVE, 'latest']));
+  // Reactive charges execution against the system contract's reserve for this contract, not its own balance
+  const [bal] = await call('0x8888888888888888888888888888888888888888', '0xd66bd524' + arg(REACTIVE), LASNA);
   set('ticks', String(ticks));
   const watched = `${users} ${users === 1n ? 'loan' : 'loans'} watched`;
   set('checked', ticks > 0n ? `${(Number(checked) / Number(ticks)).toFixed(1)} per event, ${watched}` : watched);
