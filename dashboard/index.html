@@ -67,6 +67,9 @@
   .app > .app__pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
   .app > .app__pane + .app__pane { border-left: 1px solid var(--u-line); }
   .app > .app__pane > .ui-panel { width: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  /* the rescue list scrolls inside its pane; the loan pane keeps its fade */
+  .app > .app__pane--list { overflow-y: auto; overscroll-behavior: contain; }
+  .app > .app__pane--list::after { display: none; }
   .app > .app__pane::after { content: ""; position: absolute; inset: auto 0 0 0; height: 64px; background: linear-gradient(transparent, var(--u-bg)); pointer-events: none; }
   @media (min-width: 1024px) and (max-width: 1279px) { .app.ui { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); } }
   @media (max-width: 1023px) {
@@ -118,6 +121,7 @@
   a[href*="/tx/"]::after { content: " ↗"; text-decoration: none; display: inline-block; margin-left: 2px; }
   a[href*="/tx/"]:hover { color: var(--p-ink); }
   .ui-win__who a { margin-left: 8px; font-size: 13px; }
+  .mode-help { margin: 0; line-height: 1.5; }
   .run-status { font-size: var(--t-body); min-height: 1.5em; }
   .steps { list-style: none; margin: var(--s-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-3); }
   .steps li { display: grid; grid-template-columns: 28px 1fr; column-gap: var(--s-2); align-content: start; padding-top: var(--s-3); border-top: 2px solid rgb(35 35 35 / .14); }
@@ -235,7 +239,7 @@
     <div class="wrap">
       <div class="grid">
         <h2 id="live-h" class="span-5">A demo loan you can crash</h2>
-        <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><div class="mode-pick" role="group" aria-label="How the shield rescues the demo loan" data-mode-pick hidden><span class="pos__note">Rescue by</span><button type="button" class="btn btn--secondary btn--sm" data-mode="0" aria-pressed="true">Adding collateral</button><button type="button" class="btn btn--secondary btn--sm" data-mode="1" aria-pressed="false">Repaying debt</button></div><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
+        <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><div class="mode-pick" role="group" aria-label="How the shield rescues the demo loan" data-mode-pick hidden><span class="pos__note">Rescue by</span><button type="button" class="btn btn--secondary btn--sm" data-mode="0" aria-pressed="true">Adding collateral</button><button type="button" class="btn btn--secondary btn--sm" data-mode="1" aria-pressed="false">Repaying debt</button></div><p class="pos__note mode-help"><b>Adding collateral:</b> the shield puts more of your spare WETH under the loan. <b>Repaying debt:</b> it pays back part of the USDC you borrowed from your spare USDC instead, which needs about 1.7 times less money for the same safety.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
       </div>
       <ol class="steps" data-steps aria-label="What one run does">
         <li data-step="1" data-state="wait"><span class="steps__n">1</span><span class="steps__t">Connect your wallet</span><span class="steps__d" data-step-detail>On Base Sepolia, the test network</span></li>

@@ -135,20 +135,22 @@ async function readReactive() {
 }
 
 async function readRescues() {
-  const r = await fetch(`${SCOUT}/api/v2/addresses/${A.shield}/logs`);
-  const j = await r.json();
-  // Blockscout returns one page of logs; the total comes from the contract's own counter
-  const items = j.items || [];
-  const rescues = items.filter((l) => l.topics?.[0] === RESCUED);
+  // Blockscout's filtered log API returns every Rescued event (up to 1,000), not one page of mixed events
+  const logsOf = async (topic) => {
+    const r = await fetch(`${SCOUT}/api?module=logs&action=getLogs&address=${A.shield}&topic0=${topic}&fromBlock=0&toBlock=latest`);
+    const j = await r.json();
+    return Array.isArray(j.result) ? j.result : [];
+  };
+  const [rescueLogs, detailLogs] = await Promise.all([logsOf(RESCUED), logsOf(DETAIL)]);
+  const rescues = rescueLogs.map((l) => ({ ...l, transaction_hash: l.transactionHash })).reverse(); // newest first
   // a repay-mode rescue supplies no WETH; its RescueDetail (same transaction) carries the debt it repaid
-  const repaidIn = Object.fromEntries(items.filter((l) => l.topics?.[0] === DETAIL)
-    .map((l) => [l.transaction_hash, words(l.data)[0]]));
+  const repaidIn = Object.fromEntries(detailLogs.map((l) => [l.transactionHash, words(l.data)[0]]));
   const [count] = await call(A.shield, SEL.count);
   set('count', String(count));
   const list = $('rows')[0];
   if (!list || !rescues.length) return;
   const demo = A.user.toLowerCase();
-  list.replaceChildren(...rescues.slice(0, 20).map((l) => {
+  list.replaceChildren(...rescues.slice(0, 100).map((l) => {
     const [supplied, , before, after, ts] = words(l.data);
     const user = '0x' + l.topics[1].slice(26);
     const isDemo = user === demo;
@@ -219,9 +221,11 @@ loadDeployment().then(async () => {
   const hasModes = await call(A.user, SEL.mode).then(() => true).catch(() => false);
   document.querySelectorAll('[data-mode-pick]').forEach((el) => { el.hidden = !hasModes; });
 });
-document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
-  demoMode = Number(b.dataset.mode);
-  document.querySelectorAll('[data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+// only the picker's buttons: the design kit also sets data-mode="light" on <html>
+const modeButtons = document.querySelectorAll('button[data-mode]');
+modeButtons.forEach((b) => b.addEventListener('click', () => {
+  demoMode = b.dataset.mode === '1' ? 1 : 0;
+  modeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
 }));
 
 // ---- Run a rescue: the visitor's wallet calls DemoLoan.run(); the five steps on the page follow the loop
@@ -281,7 +285,7 @@ async function runRescue() {
     step(2, 'now', 'Confirm in your wallet: DemoLoan.run(), no tokens or approvals');
     status('Step 2 of 5: confirm the transaction in your wallet.');
     const lasnaFrom = Number(await rpcAt(LASNA, 'eth_blockNumber', [])) - 2;
-    const data = demoMode === 0 ? SEL.run : SEL.runWithMode + demoMode.toString(16).padStart(64, '0');
+    const data = demoMode === 1 ? SEL.runWithMode + '1'.padStart(64, '0') : SEL.run;
     const hash = await wallet.request({ method: 'eth_sendTransaction', params: [{ from, to: A.user, data }] });
     step(2, 'done', `Sent ${txLink(hash, short(hash))}`);
 
