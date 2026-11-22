@@ -130,6 +130,7 @@ async function readReactive() {
   set('checked', ticks > 0n ? `${(Number(checked) / Number(ticks)).toFixed(1)} per event, ${watched}` : watched);
   set('requested', `${requested} (${early} early)`);
   set('cron', String(cron));
+  set('loans', String(users));
   set('lreact', eth(bal, 3) + ' lREACT');
 }
 
@@ -137,20 +138,33 @@ async function readRescues() {
   const r = await fetch(`${SCOUT}/api/v2/addresses/${A.shield}/logs`);
   const j = await r.json();
   // Blockscout returns one page of logs; the total comes from the contract's own counter
-  const rescues = (j.items || []).filter((l) => l.topics?.[0] === RESCUED);
+  const items = j.items || [];
+  const rescues = items.filter((l) => l.topics?.[0] === RESCUED);
+  // a repay-mode rescue supplies no WETH; its RescueDetail (same transaction) carries the debt it repaid
+  const repaidIn = Object.fromEntries(items.filter((l) => l.topics?.[0] === DETAIL)
+    .map((l) => [l.transaction_hash, words(l.data)[0]]));
   const [count] = await call(A.shield, SEL.count);
   set('count', String(count));
   const list = $('rows')[0];
   if (!list || !rescues.length) return;
+  const demo = A.user.toLowerCase();
   list.replaceChildren(...rescues.slice(0, 20).map((l) => {
     const [supplied, , before, after, ts] = words(l.data);
+    const user = '0x' + l.topics[1].slice(26);
+    const isDemo = user === demo;
+    const repaid = repaidIn[l.transaction_hash] || 0n;
+    const did = supplied > 0n ? `added ${eth(supplied, 5)} WETH` : `repaid ${(Number(repaid) / 1e6).toFixed(2)} USDC`;
+    const mins = Math.max(0, Math.round((Date.now() / 1000 - Number(ts)) / 60));
     const li = document.createElement('li');
     li.className = 'ui-win__row';
-    const mins = Math.max(0, Math.round((Date.now() / 1000 - Number(ts)) / 60));
-    li.innerHTML = `<span class="ui-avatar" data-tone="1">R</span><span class="ui-win__who"></span><span class="ui-win__sub"></span><span class="ui-win__st is-done">Rescued</span><span class="ui-win__age"></span>`;
-    li.children[1].textContent = String(l.block_number);
-    li.children[2].innerHTML = `${hf(before)} → ${hf(after)} · <a href="${SCOUT}/tx/${l.transaction_hash}" target="_blank" rel="noopener">${l.transaction_hash.slice(0, 10)}…</a>`;
-    li.children[4].textContent = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+    li.innerHTML = `<span class="ui-avatar" data-tone="${isDemo ? 2 : 1}">${isDemo ? 'D' : 'B'}</span><span class="ui-win__who"><span></span><a target="_blank" rel="noopener"></a></span><span class="ui-win__sub"></span><span class="ui-win__age"></span>`;
+    li.children[1].firstChild.textContent = isDemo ? 'Demo loan' : 'Benchmark loan';
+    li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)} · HF ${hf(before)} → ${hf(after)}`;
+    const a = li.children[1].lastChild;
+    a.href = `${SCOUT}/tx/${l.transaction_hash}`;
+    a.title = l.transaction_hash;
+    a.textContent = `${l.transaction_hash.slice(0, 10)}…`;
+    li.children[3].textContent = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
     return li;
   }));
 }

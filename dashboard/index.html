@@ -113,6 +113,11 @@
   #how .panel { --p-h: 480px; }
   @media (max-width: 639px) { #fees .panel { --p-h: 360px; } #how .panel { --p-h: 380px; } }
   .rows__value a, .tx { font-family: var(--font-mono); }
+  /* every transaction hash on the page is a link to its block explorer, and looks like one */
+  a[href*="/tx/"] { font-family: var(--font-mono); color: #1f6b3a; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+  a[href*="/tx/"]::after { content: " ↗"; text-decoration: none; display: inline-block; margin-left: 2px; }
+  a[href*="/tx/"]:hover { color: var(--p-ink); }
+  .ui-win__who a { margin-left: 8px; font-size: 13px; }
   .run-status { font-size: var(--t-body); min-height: 1.5em; }
   .steps { list-style: none; margin: var(--s-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-3); }
   .steps li { display: grid; grid-template-columns: 28px 1fr; column-gap: var(--s-2); align-content: start; padding-top: var(--s-3); border-top: 2px solid rgb(35 35 35 / .14); }
@@ -244,19 +249,22 @@
           <div class="ui ui-panel ui-win" data-ui="window" data-open="Rescued" data-work="Pending" data-done="Rescued">
             <div class="ui-win__bar">
               <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="ui-win__crumb">Parapet <i>/</i> <b>Rescues</b></span>
+              <span class="ui-win__crumb">Parapet <i>/</i> <b>Every rescue, newest first</b></span>
               <span class="ui-spacer"></span>
             </div>
             <div class="ui-win__body">
               <nav class="ui-win__side" aria-hidden="true">
                 <span class="ui-win__nav is-on">Rescues<em data-live="count">2</em></span>
-                <span class="ui-win__nav">Loans<em>1</em></span>
+                <span class="ui-win__nav">Loans<em data-live="loans">2</em></span>
+                <span class="ui-win__label">Key</span>
+                <span class="ui-win__nav"><span class="ui-win__hash">D</span>Demo loan</span>
+                <span class="ui-win__nav"><span class="ui-win__hash">B</span>Benchmark</span>
                 <span class="ui-win__label">Chains</span>
                 <span class="ui-win__nav"><span class="ui-win__hash">#</span>Base Sepolia</span>
                 <span class="ui-win__nav"><span class="ui-win__hash">#</span>Lasna</span>
               </nav>
               <div class="ui-win__main">
-                <div class="ui-win__cols" aria-hidden="true"><span>Block</span><span>Health factor</span><span>Status</span><span>Age</span></div>
+                <div class="ui-win__cols" aria-hidden="true"><span>Loan</span><span>What the rescue did</span><span>Transaction</span><span>When</span></div>
                 <ul class="ui-win__rows" data-live="rows">
                   <li class="ui-win__row"><span class="ui-avatar" data-tone="1">R</span><span class="ui-win__who">61790554</span><span class="ui-win__sub">1.09 → 1.40 · 0.00148 WETH</span><span class="ui-win__st is-done">Rescued</span><span class="ui-win__age">tx</span></li>
                   <li class="ui-win__row"><span class="ui-avatar" data-tone="1">R</span><span class="ui-win__who">61790299</span><span class="ui-win__sub">1.08 → 1.40 · 0.00119 WETH</span><span class="ui-win__st is-done">Rescued</span><span class="ui-win__age">tx</span></li>
