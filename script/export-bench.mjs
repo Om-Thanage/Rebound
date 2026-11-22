@@ -2,11 +2,11 @@
 // Usage: node script/export-bench.mjs
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
-const rows = readFileSync(new URL('../results/bench.csv', import.meta.url), 'utf8').trim().split('\n').slice(1)
+const rows = readFileSync(new URL('../results/bench.csv', import.meta.url), 'utf8').trim().split(/\r?\n/).slice(1)
   .map((l) => l.split(','))
   .filter((c) => c[6] !== '' && c[6] !== undefined)
-  .map(([round, priceTx, priceBlock, reqBlock, rescueTx, rescueBlock, blocks, e2e, toReactive, hf]) => ({
-    round: +round, priceTx, priceBlock: +priceBlock, rescueTx, rescueBlock: +rescueBlock,
+  .map(([round, priceTx, priceBlock, reqBlock, rescueTx, rescueBlock, blocks, e2e, toReactive, hf, lasnaTx]) => ({
+    round: +round, priceTx, priceBlock: +priceBlock, rescueTx, rescueBlock: +rescueBlock, lasnaTx: lasnaTx || null, lasnaBlock: reqBlock ? +reqBlock : null,
     blocks: +blocks, seconds: +e2e, toReactive: toReactive === '' ? null : +toReactive, hfAfter: hf,
   }));
 

@@ -15,7 +15,7 @@ B="--rpc-url $BASE_SEPOLIA_RPC --private-key $PRIVATE_KEY"
 R="--rpc-url $REACTIVE_LASNA_RPC"
 OUT=results/bench.csv
 mkdir -p results
-[ -f "$OUT" ] || echo "round,price_tx,price_block,request_lasna_block,rescue_tx,rescue_block,blocks,end_to_end_s,to_reactive_s,hf_after" > "$OUT"
+[ -f "$OUT" ] || echo "round,price_tx,price_block,request_lasna_block,rescue_tx,rescue_block,blocks,end_to_end_s,to_reactive_s,hf_after,lasna_tx" > "$OUT"
 
 RESCUED=$(cast keccak "Rescued(address,uint256,uint256,uint256,uint256,uint256)")
 REQUESTED=$(cast keccak "RescueRequested(address,uint256,uint256,uint256)")
@@ -54,21 +54,22 @@ for round in $(seq "$START" $((START + ROUNDS - 1))); do
     rescue=$(logs "$BASE_SEPOLIA_RPC" "$price_block" $((price_block + 199)) "$SHIELD" "$RESCUED")
     [ -n "$rescue" ] && break; sleep 0.5
   done
-  if [ -z "$rescue" ]; then echo "round $round: no rescue within 60s"; echo "$round,$price_tx,$price_block,,,,,,," >> "$OUT"; continue; fi
+  if [ -z "$rescue" ]; then echo "round $round: no rescue within 60s"; echo "$round,$price_tx,$price_block,,,,,,,," >> "$OUT"; continue; fi
   rescue_tx=$(echo "$rescue" | field .transactionHash)
   rescue_block=$(( $(echo "$rescue" | field .blockNumber) ))
 
-  request=$(logs "$REACTIVE_LASNA_RPC" "$lasna_from" $((lasna_from + 120)) "$REACTIVE" "$REQUESTED")
-  req_block=""; to_reactive=""
+  request=$(logs "$REACTIVE_LASNA_RPC" "$lasna_from" latest "$REACTIVE" "$REQUESTED")
+  req_block=""; to_reactive=""; lasna_tx=""
   if [ -n "$request" ]; then
     req_block=$(( $(echo "$request" | field .blockNumber) ))
+    lasna_tx=$(echo "$request" | field .transactionHash)
     to_reactive=$(( $(cast block "$req_block" -f timestamp $R) - price_ts ))
   fi
 
   blocks=$((rescue_block - price_block))
   e2e=$(awk -v b="$blocks" 'BEGIN{printf "%.1f", b*0.2}')
   hf=$(cast call "$POOL" "getUserAccountData(address)(uint256,uint256,uint256,uint256,uint256,uint256)" "$DEPLOYER" --rpc-url "$BASE_SEPOLIA_RPC" | sed -n 6p | awk '{print $1}')
-  echo "$round,$price_tx,$price_block,$req_block,$rescue_tx,$rescue_block,$blocks,$e2e,$to_reactive,$hf" >> "$OUT"
+  echo "$round,$price_tx,$price_block,$req_block,$rescue_tx,$rescue_block,$blocks,$e2e,$to_reactive,$hf,$lasna_tx" >> "$OUT"
   echo "round $round: $blocks blocks = ${e2e}s end to end (price -> Lasna ${to_reactive:-?}s), HF after $hf"
 done
 
