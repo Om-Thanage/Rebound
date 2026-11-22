@@ -165,17 +165,33 @@ async function readBench() {
   set('summary', `Median of ${summary.rounds} rounds. Fastest ${summary.min.toFixed(1)} s, p90 ${summary.p90.toFixed(1)} s, slowest ${summary.max.toFixed(1)} s.`);
   const list = $('bench')[0];
   const top = Math.max(...rows.map((x) => x.seconds), 1);
-  // each round: its share of the slowest, then the three transactions of the loop and the time end to end
-  const tx = (base, h, label) => h ? `<a class="tx" href="${base}/tx/${h}" target="_blank" rel="noopener" title="${h}">${label} ${h.slice(0, 6)}…</a>` : '<span class="muted">n/a</span>';
+  const loop = $('loop')[0];
+  const short = (h) => `${h.slice(0, 10)}…${h.slice(-4)}`;
+  const txa = (base, h) => `<a href="${base}/tx/${h}" target="_blank" rel="noopener" title="${h}">${short(h)}</a>`;
+  const show = (x) => {
+    list.querySelectorAll('button').forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.round === String(x.round))));
+    const lasna = x.lasnaTx
+      ? `<li><span class="loop__n">2</span><span class="loop__head">Rescue request on Reactive Lasna ${txa(LASNA_SCAN, x.lasnaTx)}</span><span class="loop__what">Logs: <b>RescueRequested</b> from ShieldReactive, with the loan and its health factor under 1.15. Sent by Reactive itself, no keeper.</span></li>`
+      : '';
+    loop.innerHTML = `<h3>Round ${x.round}: check it on the explorers</h3><ol>
+      <li><span class="loop__n">1</span><span class="loop__head">Price drop on Base Sepolia ${txa(SCOUT, x.priceTx)}</span><span class="loop__what">Logs: <b>AnswerUpdated</b> from the WETH feed, 180000000000 = $1,800 (8 decimals).</span></li>
+      ${lasna}
+      <li><span class="loop__n">${lasna ? 3 : 2}</span><span class="loop__head">Rescue on Base Sepolia ${txa(SCOUT, x.rescueTx)}</span><span class="loop__what">Logs: <b>Rescued</b> from LiquidationShield, hfBefore 1.08 and hfAfter 1.40. ${x.blocks} blocks (${x.seconds.toFixed(1)} s) after step 1.</span></li>
+    </ol>`;
+  };
   list.replaceChildren(...rows.slice(0, 20).map((x) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span></span><i></i>${tx(SCOUT, x.priceTx, 'Price')}${tx(LASNA_SCAN, x.lasnaTx, 'Lasna')}${tx(SCOUT, x.rescueTx, 'Rescue')}<b></b>`;
-    li.children[0].textContent = `Round ${x.round}`;
-    li.children[1].style.setProperty('--w', (x.seconds / top * 100).toFixed(1) + '%');
-    li.querySelector('b').textContent = `${x.seconds.toFixed(1)} s`;
-    li.querySelector('b').title = `${x.blocks} Base blocks`;
+    li.innerHTML = `<button type="button" aria-pressed="false"><span></span><span class="bars__track"><span class="bars__fill"></span></span><span class="bars__val"></span></button>`;
+    const btn = li.firstChild;
+    btn.dataset.round = String(x.round);
+    btn.firstChild.textContent = `Round ${x.round}`;
+    btn.querySelector('.bars__fill').style.setProperty('--w', (x.seconds / top * 100).toFixed(1) + '%');
+    btn.querySelector('.bars__val').textContent = `${x.seconds.toFixed(1)} s · ${x.blocks} blocks`;
+    btn.setAttribute('aria-label', `Round ${x.round}: ${x.seconds.toFixed(1)} seconds, ${x.blocks} Base blocks. Show its transactions.`);
+    btn.addEventListener('click', () => show(x));
     return li;
   }));
+  if (rows.length) show(rows[0]);
 }
 
 const safe = (f) => f().catch((e) => console.warn('live data:', e.message));
