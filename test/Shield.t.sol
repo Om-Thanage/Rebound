@@ -9,21 +9,51 @@ import {IPayable} from "reactive-lib/interfaces/IPayable.sol";
 import {AbstractCallback} from "reactive-lib/base/AbstractCallback.sol";
 import {MockERC20, MockWETH} from "../src/mocks/MockTokens.sol";
 import {MockAaveOracle} from "../src/mocks/MockAaveOracle.sol";
+import {MockAggregator, MockAggregatorProxy} from "../src/mocks/MockAggregator.sol";
 import {MockAavePool} from "../src/mocks/MockAavePool.sol";
-import {LiquidationShield, IAavePool, IAaveOracle, IWETH} from "../src/LiquidationShield.sol";
+import {LiquidationShield, IAavePool, IAaveOracle, IWETH, IERC20Lite} from "../src/LiquidationShield.sol";
 import {ShieldReactive} from "../src/ShieldReactive.sol";
 import {DemoLoan} from "../src/DemoLoan.sol";
 
 /// Stands in for the Reactive system contract at 0x8888...: records subscriptions and callback requests.
 contract MockSystem {
-    uint256 public subscriptions;
+    struct Sub {
+        uint256 chainId;
+        address emitter;
+        uint256 topic0;
+    }
+
+    Sub[] public subs;
+    uint256 public unsubscriptions;
     ISystemContract.CallbackConfiguration_V_1_0[] internal callbacks;
 
-    function subscribe(uint256, address, uint256, uint256, uint256, uint256) external {
-        subscriptions++;
+    function subscribe(uint256 chainId, address emitter, uint256 topic0, uint256, uint256, uint256) external {
+        subs.push(Sub(chainId, emitter, topic0));
+    }
+
+    function unsubscribe(uint256, address, uint256, uint256, uint256, uint256) external {
+        unsubscriptions++;
+    }
+
+    function subscriptions() external view returns (uint256) {
+        return subs.length;
+    }
+
+    bool public light; // only count and emit, like the real system contract, for gas measurements
+    uint256 public lightCount;
+
+    event CallbackRequest(uint256 indexed chainId, address indexed sender, address indexed recipient, bytes config);
+
+    function setLight(bool on) external {
+        light = on;
     }
 
     function requestCallbackV_1_0(ISystemContract.CallbackConfiguration_V_1_0 memory c) external {
+        if (light) {
+            lightCount++;
+            emit CallbackRequest(c.chainId, msg.sender, c.recipient, abi.encode(c));
+            return;
+        }
         callbacks.push(c);
     }
 
@@ -71,10 +101,18 @@ contract MockProxy {
 contract ShieldTest is Test {
     address constant SYSTEM_ADDR = 0x8888888888888888888888888888888888888888;
     uint256 constant ORIGIN = 84532;
+    uint256 constant LEAD = 11155111;
+    uint256 constant CRON_TOPIC = uint256(keccak256("Cron100(uint256)"));
 
     MockWETH weth;
     MockERC20 usdc;
+    MockERC20 wbtc;
     MockAaveOracle oracle;
+    MockAggregator aggWeth;
+    MockAggregator aggWbtc;
+    MockAggregator aggLead;
+    MockAggregatorProxy proxyWeth;
+    MockAggregatorProxy proxyWbtc;
     MockAavePool pool;
     MockProxy proxy;
     MockSystem sys;
@@ -82,118 +120,253 @@ contract ShieldTest is Test {
     LiquidationShield shield;
 
     address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+    address carol = makeAddr("carol");
 
     function setUp() public {
         vm.etch(SYSTEM_ADDR, address(new MockSystem()).code);
         sys = MockSystem(payable(SYSTEM_ADDR));
+        vm.warp(1_800_000_000);
 
         weth = new MockWETH();
         usdc = new MockERC20("Test USD Coin", "tUSDC", 6);
+        wbtc = new MockERC20("Test Wrapped BTC", "tWBTC", 8);
         oracle = new MockAaveOracle();
+        aggWeth = new MockAggregator();
+        aggWbtc = new MockAggregator();
+        aggLead = new MockAggregator();
+        proxyWeth = new MockAggregatorProxy(aggWeth);
+        proxyWbtc = new MockAggregatorProxy(aggWbtc);
+        oracle.setAssetSource(address(weth), proxyWeth);
+        oracle.setAssetSource(address(wbtc), proxyWbtc);
         pool = new MockAavePool(weth, usdc, oracle);
+        pool.listCollateral(address(wbtc), 7300, 7800, 10_500, 8);
         proxy = new MockProxy();
         oracle.setAssetPrice(address(weth), 2000e8);
+        oracle.setAssetPrice(address(wbtc), 60_000e8);
 
-        // reactive contract needs the shield address and vice versa: predict the shield's address
+        // the reactive contract needs the shield address and vice versa: predict the shield's address
         address predictedShield = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-        rc = new ShieldReactive(ORIGIN, address(oracle), predictedShield, address(weth));
-        shield = new LiquidationShield(
-            IPayable(payable(address(proxy))),
-            address(rc),
-            IAavePool(address(pool)),
-            IAaveOracle(address(oracle)),
-            IWETH(address(weth)),
-            30, // 0.30%
-            0.0001 ether
-        );
+        rc = new ShieldReactive(_rcConfig(predictedShield));
+        shield = new LiquidationShield(IPayable(payable(address(proxy))), address(rc), _shieldConfig(0));
         assertEq(address(shield), predictedShield);
 
-        // alice: 1 WETH collateral at $2000, borrows $1500 -> HF = 2000*0.825/1500 = 1.1
-        vm.deal(alice, 10 ether);
-        vm.startPrank(alice);
-        weth.deposit{value: 3 ether}();
+        _openLoan(alice, 1 ether, 1200e6); // HF = 2000 * 0.825 / 1200 = 1.375
+    }
+
+    function _rcConfig(address shield_) internal view returns (ShieldReactive.Config memory c) {
+        c.originChainId = ORIGIN;
+        c.shield = shield_;
+        c.assets = _pair(address(weth), address(wbtc));
+        c.decimals = new uint8[](2);
+        c.decimals[0] = 18;
+        c.decimals[1] = 8;
+        c.feeds = _pair(address(aggWeth), address(aggWbtc));
+        c.proxies = _pair(address(proxyWeth), address(proxyWbtc));
+        c.bucketWidths = new uint256[](2);
+        c.bucketWidths[0] = 10e8; // $10 buckets for WETH
+        c.bucketWidths[1] = 250e8;
+        c.cronTopic = CRON_TOPIC;
+        c.leadChainId = LEAD;
+        c.leadFeed = address(aggLead);
+        c.leadAsset = 0;
+    }
+
+    function _shieldConfig(uint256 watchFee) internal view returns (LiquidationShield.Config memory c) {
+        c.pool = IAavePool(address(pool));
+        c.oracle = IAaveOracle(address(oracle));
+        c.weth = IWETH(address(weth));
+        c.debtAsset = IERC20Lite(address(usdc));
+        c.collateralAssets = _pair(address(weth), address(wbtc));
+        c.aTokens = _pair(pool.aTokenOf(address(weth)), pool.aTokenOf(address(wbtc)));
+        c.feeBps = 30; // 0.30%
+        c.minFeeWei = 0.0001 ether;
+        c.watchFeeWeiPerDay = watchFee;
+    }
+
+    function _pair(address a, address b) internal pure returns (address[] memory r) {
+        r = new address[](2);
+        r[0] = a;
+        r[1] = b;
+    }
+
+    function _openLoan(address who, uint256 coll, uint256 debt) internal {
+        vm.deal(who, 10 ether);
+        vm.startPrank(who);
+        weth.deposit{value: 5 ether}();
         weth.approve(address(pool), type(uint256).max);
         weth.approve(address(shield), type(uint256).max);
-        pool.supply(address(weth), 1 ether, alice, 0);
-        pool.borrow(address(usdc), 1200e6, 2, 0, alice); // HF = 2000*0.825/1200 = 1.375
+        usdc.approve(address(pool), type(uint256).max);
+        usdc.approve(address(shield), type(uint256).max);
+        pool.supply(address(weth), coll, who, 0);
+        pool.borrow(address(usdc), debt, 2, 0, who);
         vm.stopPrank();
     }
 
     // ---- helpers that replay what the Reactive Network would do
 
-    function _log(address emitter, uint256 topic0, uint256 topic1, bytes memory data)
-        internal
-        view
-        returns (IReactive.LogRecord memory l)
-    {
-        l.chainId = ORIGIN;
-        l.contractAddress = emitter;
-        l.topic0 = topic0;
-        l.topic1 = topic1;
-        l.data = data;
+    function _toRecord(Vm.Log memory lg, uint256 chainId) internal view returns (IReactive.LogRecord memory l) {
+        l.chainId = chainId;
+        l.contractAddress = lg.emitter;
+        l.topic0 = uint256(lg.topics[0]);
+        if (lg.topics.length > 1) l.topic1 = uint256(lg.topics[1]);
+        if (lg.topics.length > 2) l.topic2 = uint256(lg.topics[2]);
+        if (lg.topics.length > 3) l.topic3 = uint256(lg.topics[3]);
+        l.data = lg.data;
         l.blockNumber = block.number;
     }
 
-    /// Forward every PositionSnapshot the shield just emitted into the reactive contract.
-    function _relaySnapshots() internal {
+    /// Forward every recorded log the reactive contract is subscribed to, in order, as the network would.
+    function _relayAll() internal {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].emitter == address(shield) && uint256(logs[i].topics[0]) == rc.SNAPSHOT_TOPIC()) {
-                IReactive.LogRecord memory l = _log(address(shield), rc.SNAPSHOT_TOPIC(), uint256(logs[i].topics[1]), logs[i].data);
-                vm.prank(SYSTEM_ADDR); // build the log first: any call in between would use up the prank
-                rc.react(l);
-            }
+            if (logs[i].topics.length == 0 || !_subscribed(logs[i].emitter, uint256(logs[i].topics[0]))) continue;
+            uint256 chainId = logs[i].emitter == address(aggLead) ? LEAD : ORIGIN;
+            IReactive.LogRecord memory l = _toRecord(logs[i], chainId);
+            vm.prank(SYSTEM_ADDR); // build the log first: any call in between would use up the prank
+            rc.react(l);
         }
     }
 
+    function _subscribed(address emitter, uint256 topic0) internal view returns (bool) {
+        for (uint256 i; i < sys.subscriptions(); ++i) {
+            (, address e, uint256 t) = sys.subs(i);
+            if (e == emitter && t == topic0) return true;
+        }
+        return false;
+    }
+
+    function _movePrice(address asset, uint256 price) internal {
+        vm.recordLogs();
+        oracle.setAssetPrice(asset, price);
+        _relayAll();
+    }
+
     function _movePrice(uint256 price) internal {
-        oracle.setAssetPrice(address(weth), price);
-        IReactive.LogRecord memory l =
-            _log(address(oracle), rc.PRICE_UPDATED_TOPIC(), uint256(uint160(address(weth))), abi.encode(price, block.timestamp));
+        _movePrice(address(weth), price);
+    }
+
+    function _leadPrice(uint256 price) internal {
+        vm.recordLogs();
+        aggLead.updateAnswer(int256(price));
+        _relayAll();
+    }
+
+    function _cron() internal {
+        IReactive.LogRecord memory l;
+        l.chainId = block.chainid;
+        l.contractAddress = SYSTEM_ADDR;
+        l.topic0 = CRON_TOPIC;
         vm.prank(SYSTEM_ADDR);
         rc.react(l);
     }
 
-    function _deliverLastCallback() internal {
-        ISystemContract.CallbackConfiguration_V_1_0 memory c = sys.callbackAt(sys.callbackCount() - 1);
+    function _deliver(uint256 i) internal {
+        ISystemContract.CallbackConfiguration_V_1_0 memory c = sys.callbackAt(i);
         assertEq(c.chainId, ORIGIN);
         assertEq(c.recipient, address(shield));
+        vm.recordLogs();
         proxy.deliver(c.recipient, c.payload, address(rc));
+        _relayAll();
+    }
+
+    function _deliverLastCallback() internal {
+        _deliver(sys.callbackCount() - 1);
+    }
+
+    function _protect(address who, uint256 reserve) internal {
+        vm.recordLogs();
+        vm.prank(who);
+        shield.protect(1.15e18, 1.4e18, reserve);
+        _relayAll();
     }
 
     function _protectAlice(uint256 reserve) internal {
+        _protect(alice, reserve);
+    }
+
+    function _configure(address who, uint64 step, LiquidationShield.Mode mode) internal {
         vm.recordLogs();
-        vm.prank(alice);
-        shield.protect(1.15e18, 1.4e18, reserve);
-        _relaySnapshots();
+        vm.prank(who);
+        shield.configure(1.15e18, 1.4e18, step, mode);
+        _relayAll();
+    }
+
+    function _depositRepay(address who, uint256 amount) internal {
+        vm.recordLogs();
+        vm.prank(who);
+        shield.depositRepayReserve(amount);
+        _relayAll();
     }
 
     function _hf(address u) internal view returns (uint256 hf) {
         (,,,,, hf) = pool.getUserAccountData(u);
     }
 
-    // ---- tests
-
-    function test_subscribesToPriceAndSnapshots() public view {
-        assertEq(sys.subscriptions(), 2);
+    function _reserve(address u) internal view returns (uint128 r) {
+        (r,,,,,,,,) = shield.protections(u);
     }
 
-    function test_fullLoop_crashTriggersRescueToTarget() public {
-        _protectAlice(1 ether);
-        (uint128 coll,,,, bool active,,) = rc.positions(alice);
-        assertEq(coll, 1 ether);
-        assertTrue(active);
+    function _repayReserve(address u) internal view returns (uint128 r) {
+        (, r,,,,,,,) = shield.protections(u);
+    }
 
-        _movePrice(1900e8); // HF 1.306: above trigger, nothing happens
+    function _pending(address u) internal view returns (bool pending) {
+        (,,,,,,,,,, pending,) = rc.positions(u);
+    }
+
+    function _decodeHint(uint256 i) internal view returns (uint256 hint) {
+        bytes memory payload = sys.callbackAt(i).payload;
+        assembly {
+            hint := mload(add(payload, 100)) // 4-byte selector + 32 (sender) + 32 (user) + 32 (hint)
+        }
+    }
+
+    // ---- wiring
+
+    function test_subscribesToFeedsProxiesSnapshotsLeadAndCron() public view {
+        assertEq(sys.subscriptions(), 7);
+        (uint256 chainId, address emitter, uint256 topic) = sys.subs(6);
+        assertEq(chainId, block.chainid, "CRON comes from Reactive Network itself");
+        assertEq(emitter, SYSTEM_ADDR);
+        assertEq(topic, CRON_TOPIC);
+        (chainId, emitter,) = sys.subs(5);
+        assertEq(chainId, LEAD);
+        assertEq(emitter, address(aggLead));
+    }
+
+    function test_reactOnlyFromSystem() public {
+        IReactive.LogRecord memory l;
+        l.chainId = ORIGIN;
+        l.contractAddress = address(aggWeth);
+        l.topic0 = rc.ANSWER_UPDATED_TOPIC();
+        vm.expectRevert();
+        rc.react(l);
+    }
+
+    function test_readsChainlinkAnswerFromTopic() public {
+        _movePrice(1987e8);
+        assertEq(rc.lastPrice(0), 1987e8);
+        assertEq(rc.priceTicks(), 1);
+    }
+
+    // ---- the core loop
+
+    function test_fullLoop_crashTriggersRescueToTarget() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        assertEq(rc.collateralOf(alice, 0), 1 ether);
+        assertEq(rc.userCount(), 1);
+
+        _movePrice(1900e8); // HF 1.306, and 1.24 if it falls another $100: nothing happens
         assertEq(sys.callbackCount(), 0);
 
         _movePrice(1600e8); // HF 1.1: under the 1.15 trigger
         assertEq(sys.callbackCount(), 1);
-        (,,,,, bool pending,) = rc.positions(alice);
-        assertTrue(pending);
+        assertTrue(_pending(alice));
+        assertEq(_decodeHint(0), 0, "already under: no hint needed");
 
         uint256 ethBefore = address(shield).balance;
-        vm.recordLogs();
         _deliverLastCallback();
 
         uint256 hf = _hf(alice);
@@ -203,10 +376,8 @@ contract ShieldTest is Test {
         assertEq(shield.rescueCount(), 1);
 
         // the shield's fresh snapshot clears pending and mirrors the new collateral
-        _relaySnapshots();
-        (uint128 collAfter,,,,, bool pendingAfter,) = rc.positions(alice);
-        assertFalse(pendingAfter);
-        assertGt(collAfter, 1 ether);
+        assertFalse(_pending(alice));
+        assertGt(rc.collateralOf(alice, 0), 1 ether);
 
         // the same price again does not fire another rescue
         _movePrice(1600e8);
@@ -218,6 +389,32 @@ contract ShieldTest is Test {
         _movePrice(1600e8);
         _movePrice(1550e8);
         assertEq(sys.callbackCount(), 1);
+    }
+
+    function test_pendingExpiresWhenCallbackIsLost() public {
+        _protectAlice(1 ether);
+        _movePrice(1600e8);
+        assertEq(sys.callbackCount(), 1);
+        vm.warp(block.timestamp + 30);
+        _movePrice(1590e8);
+        assertEq(sys.callbackCount(), 1, "still waiting for the first callback");
+        vm.warp(block.timestamp + 31);
+        _movePrice(1580e8);
+        assertEq(sys.callbackCount(), 2, "lost callback no longer blocks the loan");
+    }
+
+    function test_cooldownTravelsInSnapshot() public {
+        _protectAlice(2 ether);
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        _movePrice(1000e8); // deep crash inside the shield's 10 s cooldown: don't waste a callback on a skip
+        assertEq(sys.callbackCount(), 1);
+        vm.warp(block.timestamp + 11);
+        _movePrice(990e8);
+        assertEq(sys.callbackCount(), 2);
+        _deliverLastCallback();
+        assertGe(_hf(alice), 1.4e18);
+        assertEq(shield.skippedCallbacks(), 0);
     }
 
     function test_feesPayForCallbackGas() public {
@@ -240,9 +437,16 @@ contract ShieldTest is Test {
         _movePrice(1600e8);
         uint256 before = _hf(alice);
         _deliverLastCallback();
-        (uint128 reserve,,,) = shield.protections(alice);
-        assertEq(reserve, 0, "used the whole reserve");
+        assertEq(_reserve(alice), 0, "used the whole reserve");
         assertGt(_hf(alice), before, "still improved");
+    }
+
+    function test_feelessRescueIsCounted() public {
+        _protectAlice(0.00005 ether); // below the 0.0001 ETH fee floor
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        assertEq(shield.feelessRescues(), 1);
+        assertEq(shield.rescueCount(), 1);
     }
 
     function test_skipsWhenLivePositionIsHealthy() public {
@@ -251,14 +455,14 @@ contract ShieldTest is Test {
         oracle.setAssetPrice(address(weth), 2000e8); // price bounced before the callback landed
         _deliverLastCallback();
         assertEq(shield.rescueCount(), 0);
-        (uint128 reserve,,,) = shield.protections(alice);
-        assertEq(reserve, 1 ether, "nothing spent");
+        assertEq(shield.skippedCallbacks(), 1);
+        assertEq(_reserve(alice), 1 ether, "nothing spent");
     }
 
     function test_rejectsCallerThatIsNotProxy() public {
         _protectAlice(1 ether);
         vm.expectRevert();
-        shield.rescue(address(rc), alice);
+        shield.rescue(address(rc), alice, 0);
     }
 
     function test_rejectsCallbackFromOtherReactiveContract() public {
@@ -269,22 +473,16 @@ contract ShieldTest is Test {
         proxy.deliver(c.recipient, c.payload, address(0xBAD));
     }
 
-    function test_reactOnlyFromSystem() public {
-        IReactive.LogRecord memory l =
-            _log(address(oracle), rc.PRICE_UPDATED_TOPIC(), uint256(uint160(address(weth))), abi.encode(1, 1));
-        vm.expectRevert();
-        rc.react(l);
-    }
-
     function test_cooldownBlocksBackToBackRescues() public {
         _protectAlice(1 ether);
         _movePrice(1600e8);
         _deliverLastCallback();
         oracle.setAssetPrice(address(weth), 1200e8);
-        proxy.deliver(address(shield), abi.encodeWithSignature("rescue(address,address)", address(0), alice), address(rc));
+        bytes memory payload = abi.encodeWithSignature("rescue(address,address,uint256)", address(0), alice, 0);
+        proxy.deliver(address(shield), payload, address(rc));
         assertEq(shield.rescueCount(), 1);
         vm.warp(block.timestamp + 11);
-        proxy.deliver(address(shield), abi.encodeWithSignature("rescue(address,address)", address(0), alice), address(rc));
+        proxy.deliver(address(shield), payload, address(rc));
         assertEq(shield.rescueCount(), 2);
     }
 
@@ -297,6 +495,7 @@ contract ShieldTest is Test {
     /// Any crash the reserve can cover ends with HF at (or just above) the target.
     function testFuzz_rescueReachesTarget(uint256 price) public {
         price = bound(price, 1000e8, 1670e8); // trigger 1.15 is crossed below ~$1672
+        _movePrice(2000e8);
         _protectAlice(2 ether);
         _movePrice(price);
         _deliverLastCallback();
@@ -305,21 +504,372 @@ contract ShieldTest is Test {
         assertLt(hf, 1.401e18);
     }
 
-    // ---- DemoLoan: the dashboard's one-click rescue
+    // ---- early trigger (falling-price projection) and price hints
 
-    /// Replay every oracle price event and shield snapshot recorded since vm.recordLogs, in log order.
-    function _relayAll() internal {
+    function test_earlyTriggerRescuesBeforeTheTriggerIsCrossed() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _movePrice(1750e8); // HF 1.203: above 1.15, but another $250 fall (capped at 5%: $1,662.5) gives 1.143
+        assertGe(_hf(alice), 1.15e18, "not under the trigger yet");
+        assertEq(sys.callbackCount(), 1, "asked for a rescue on the way down");
+        assertEq(rc.earlyRequests(), 1);
+        assertEq(_decodeHint(0), 1662.5e8);
+
+        _deliverLastCallback();
+        assertEq(shield.rescueCount(), 1);
+        // sized for the projected price, so it holds the target even if the next update is that low
+        oracle.setAssetPrice(address(weth), 1662.5e8);
+        assertGe(_hf(alice), 1.4e18);
+    }
+
+    function test_slowFallDoesNotTriggerEarly() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _movePrice(1990e8);
+        _movePrice(1980e8);
+        assertEq(sys.callbackCount(), 0);
+    }
+
+    function test_hintIsClampedToFivePercent() public {
+        _protectAlice(1 ether);
+        // a hint far under the oracle can't make a healthy loan look under its trigger: 2000 x 0.95 still gives 1.306
+        bytes memory payload = abi.encodeWithSignature("rescue(address,address,uint256)", address(0), alice, 500e8);
+        proxy.deliver(address(shield), payload, address(rc));
+        assertEq(shield.rescueCount(), 0);
+        assertEq(shield.skippedCallbacks(), 1);
+    }
+
+    function test_leadFeedOnAnotherChainRescuesAhead() public {
+        _openLoan(bob, 1 ether, 1400e6); // HF 1.179 at $2,000
+        _movePrice(2000e8);
+        _protect(bob, 1 ether);
+
+        _leadPrice(1890e8); // the same feed on another chain moved first: 1890 clamps to 1900 (5%)
+        assertEq(rc.leadTicks(), 1);
+        assertEq(sys.callbackCount(), 1);
+        assertEq(_decodeHint(0), 1900e8);
+
+        _deliverLastCallback(); // Base oracle still says $2,000
+        assertEq(shield.rescueCount(), 1);
+        oracle.setAssetPrice(address(weth), 1900e8);
+        assertGe(_hf(bob), 1.4e18, "ready for the Base update when it lands");
+    }
+
+    function test_leadFeedAboveBasePriceDoesNothing() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _leadPrice(2100e8);
+        assertEq(sys.callbackCount(), 0);
+    }
+
+    // ---- reserves, modes and staging
+
+    function test_repayModeRepaysDebtInsteadOfAddingCollateral() public {
+        _movePrice(2000e8);
+        _protectAlice(0.01 ether); // small WETH reserve: pays the fee
+        _depositRepay(alice, 1000e6);
+        _configure(alice, 0, LiquidationShield.Mode.Repay);
+
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        assertEq(pool.collateral(alice), 1 ether, "no collateral added");
+        assertLt(pool.debt(alice), 1200e6, "debt repaid");
+        assertGe(_hf(alice), 1.4e18);
+        assertLt(_hf(alice), 1.401e18);
+        assertLt(_reserve(alice), 0.01 ether, "fee came from the WETH reserve");
+    }
+
+    /// Repaying needs H / LT times less capital than topping up: 1.4 / 0.825 = 1.697.
+    function test_repayNeedsLessCapitalThanTopUp() public {
+        _openLoan(bob, 1 ether, 1200e6);
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _protect(bob, 0.01 ether);
+        _depositRepay(bob, 1000e6);
+        _configure(bob, 0, LiquidationShield.Mode.Repay);
+
+        _movePrice(1600e8);
+        assertEq(sys.callbackCount(), 2);
+        _deliver(0);
+        _deliver(1);
+        uint256 topUpUsd = (pool.collateral(alice) - 1 ether) * 1600 / 1e18; // whole dollars
+        uint256 repaidUsd = (1200e6 - pool.debt(bob)) / 1e6;
+        assertApproxEqRel(topUpUsd * 1e18 / repaidUsd, 1.697e18, 0.01e18);
+    }
+
+    function test_combinedModeRepaysThenTopsUp() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _depositRepay(alice, 50e6); // not enough to repay alone
+        _configure(alice, 0, LiquidationShield.Mode.Combined);
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        assertEq(_repayReserve(alice), 0, "repay reserve used first");
+        assertEq(pool.debt(alice), 1150e6);
+        assertGt(pool.collateral(alice), 1 ether, "then topped up");
+        assertGe(_hf(alice), 1.4e18);
+    }
+
+    function test_stagedRescueLiftsInSteps() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _configure(alice, 0.1e18, LiquidationShield.Mode.Collateral);
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        uint256 hf = _hf(alice);
+        assertGe(hf, 1.25e18, "first stage: trigger + 0.10");
+        assertLt(hf, 1.251e18);
+
+        vm.warp(block.timestamp + 11);
+        _movePrice(1400e8); // falls again: second stage
+        _deliverLastCallback();
+        assertGe(_hf(alice), 1.25e18);
+        assertEq(shield.rescueCount(), 2);
+    }
+
+    function test_withdrawBlockedWhileUnderTrigger() public {
+        _protectAlice(1 ether);
+        oracle.setAssetPrice(address(weth), 1600e8);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(LiquidationShield.UnderTrigger.selector, 1.1e18));
+        shield.withdrawReserve(0.5 ether);
+    }
+
+    function test_unprotectReturnsEverythingAndStopsWatching() public {
+        _protectAlice(1 ether);
+        _depositRepay(alice, 100e6);
+        uint256 wethBefore = weth.balanceOf(alice);
+        vm.recordLogs();
+        vm.prank(alice);
+        shield.unprotect();
+        _relayAll();
+        assertEq(weth.balanceOf(alice), wethBefore + 1 ether);
+        assertEq(_repayReserve(alice), 0);
+        assertEq(rc.userCount(), 0);
+        _movePrice(1000e8);
+        assertEq(sys.callbackCount(), 0);
+    }
+
+    function test_withdrawingAllRemovesFromReactiveList() public {
+        _protectAlice(1 ether);
+        assertEq(rc.userCount(), 1);
+        vm.recordLogs();
+        vm.prank(alice);
+        shield.withdrawReserve(1 ether);
+        _relayAll();
+        assertEq(rc.userCount(), 0);
+    }
+
+    // ---- griefing the reactive contract
+
+    function test_strangerCannotSyncSomeoneElse() public {
+        _protectAlice(1 ether);
+        vm.prank(bob);
+        vm.expectRevert(LiquidationShield.NotYourPosition.selector);
+        shield.sync(alice);
+    }
+
+    function test_emptyProtectionsAreNotPublished() public {
+        for (uint256 i; i < 20; ++i) {
+            address sybil = address(uint160(0x5000 + i));
+            vm.recordLogs();
+            vm.prank(sybil);
+            shield.protect(1.15e18, 1.4e18, 0); // no reserve
+            vm.prank(sybil);
+            shield.sync(sybil);
+            assertEq(vm.getRecordedLogs().length, 0, "no snapshot, so no reactive gas spent");
+        }
+        assertEq(rc.userCount(), 0);
+    }
+
+    // ---- scaling: buckets by trigger price
+
+    function test_bucketsPlaceSingleAssetLoansByTriggerPrice() public {
+        _protectAlice(1 ether);
+        (uint256 tp, uint256 asset) = rc.triggerPrice(alice);
+        assertEq(asset, 0);
+        assertApproxEqAbs(tp, 1672.73e8, 0.01e8); // 1.15 x 1200 / 0.825
+        assertEq(rc.bucketSize(0, tp / 10e8), 1);
+    }
+
+    function test_priceTickOnlyChecksLoansNearTheirTrigger() public {
+        _movePrice(2000e8);
+        // 120 loans with trigger prices spread from about $975 to $1,970
+        for (uint256 i; i < 120; ++i) {
+            address u = address(uint160(0x9000 + i));
+            uint256 debt = (700 + i * 6) * 1e6;
+            _openLoan(u, 1 ether, debt);
+            _protect(u, 0.5 ether);
+        }
+        assertEq(rc.userCount(), 120);
+        uint256 checkedBefore = rc.positionsChecked();
+        _movePrice(1960e8); // window $1,920 to $2,156: only loans whose trigger price is in it
+        uint256 checked = rc.positionsChecked() - checkedBefore;
+        assertGt(checked, 0);
+        assertLt(checked, 20, "a tick touches a few buckets, not every loan");
+    }
+
+    /// The worst tick: a crash that puts every loan under its trigger at once. Each check is capped per tick, so
+    /// react() stays under Reactive's 900,000 gas limit for a reactive transaction; the rest go on later ticks.
+    function test_worstCaseTickStaysUnderReactiveGasLimit() public {
+        _movePrice(2000e8);
+        for (uint256 i; i < 150; ++i) {
+            address u = address(uint160(0xA000 + i));
+            _openLoan(u, 1 ether, (1000 + i * 3) * 1e6);
+            _protect(u, 0.5 ether);
+        }
+        vm.recordLogs();
+        oracle.setAssetPrice(address(weth), 1000e8);
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i; i < logs.length; ++i) {
-            uint256 t0 = uint256(logs[i].topics[0]);
-            bool isSnap = logs[i].emitter == address(shield) && t0 == rc.SNAPSHOT_TOPIC();
-            bool isPrice = logs[i].emitter == address(oracle) && t0 == rc.PRICE_UPDATED_TOPIC();
-            if (!isSnap && !isPrice) continue;
-            IReactive.LogRecord memory l = _log(logs[i].emitter, t0, uint256(logs[i].topics[1]), logs[i].data);
+        IReactive.LogRecord memory l = _toRecord(logs[logs.length - 1], ORIGIN);
+        sys.setLight(true);
+        vm.prank(SYSTEM_ADDR);
+        uint256 g = gasleft();
+        rc.react(l);
+        uint256 used = g - gasleft();
+        emit log_named_uint("react() gas, worst tick", used);
+        emit log_named_uint("rescues requested", sys.lightCount());
+        assertLt(used, 900_000);
+        uint256 first = sys.lightCount();
+        assertGt(first, 0);
+
+        // the next tick skips the loans already waiting for a rescue and requests the next ones
+        vm.recordLogs();
+        oracle.setAssetPrice(address(weth), 999e8);
+        logs = vm.getRecordedLogs();
+        l = _toRecord(logs[logs.length - 1], ORIGIN);
+        vm.prank(SYSTEM_ADDR);
+        g = gasleft();
+        rc.react(l);
+        assertLt(g - gasleft(), 900_000);
+        assertGt(sys.lightCount(), first, "more rescues on the next tick");
+        for (uint256 i; i < 10 && sys.lightCount() < 150; ++i) {
+            vm.recordLogs();
+            oracle.setAssetPrice(address(weth), (998 - i) * 1e8);
+            logs = vm.getRecordedLogs();
+            l = _toRecord(logs[logs.length - 1], ORIGIN);
             vm.prank(SYSTEM_ADDR);
             rc.react(l);
         }
+        assertEq(sys.lightCount(), 150, "every crossed loan got its rescue within a few ticks");
+
+        // and the CRON sweep stays inside the limit too
+        vm.warp(block.timestamp + 61);
+        IReactive.LogRecord memory c;
+        c.chainId = block.chainid;
+        c.contractAddress = SYSTEM_ADDR;
+        c.topic0 = CRON_TOPIC;
+        vm.prank(SYSTEM_ADDR);
+        g = gasleft();
+        rc.react(c);
+        assertLt(g - gasleft(), 900_000);
     }
+
+    // ---- several collateral assets
+
+    function test_multiAssetLoanIsMirroredAndRescued() public {
+        vm.deal(carol, 10 ether);
+        wbtc.mint(carol, 1e8);
+        _movePrice(2000e8);
+        _movePrice(address(wbtc), 60_000e8);
+        vm.startPrank(carol);
+        weth.deposit{value: 5 ether}();
+        weth.approve(address(pool), type(uint256).max);
+        weth.approve(address(shield), type(uint256).max);
+        wbtc.approve(address(pool), type(uint256).max);
+        pool.supply(address(weth), 1 ether, carol, 0); // $2,000 at LT 0.825
+        pool.supply(address(wbtc), 0.05e8, carol, 0); // $3,000 at LT 0.78
+        pool.borrow(address(usdc), 3000e6, 2, 0, carol); // HF = (1650 + 2340) / 3000 = 1.33
+        vm.stopPrank();
+        _protect(carol, 2 ether);
+
+        assertEq(rc.collateralOf(carol, 1), 0.05e8);
+        (, uint256 asset) = rc.triggerPrice(carol);
+        assertEq(asset, type(uint256).max, "two assets: scanned on every tick");
+        assertApproxEqRel(rc.mirroredHF(carol), _hf(carol), 0.0001e18);
+
+        _movePrice(address(wbtc), 45_000e8); // WBTC -25%: HF 1.135
+        assertEq(sys.callbackCount(), 1);
+        _deliverLastCallback();
+        assertGe(_hf(carol), 1.4e18, "topped up with WETH to target");
+        assertLt(_hf(carol), 1.401e18);
+    }
+
+    // ---- following the Chainlink aggregator
+
+    function test_followsAggregatorReplacement() public {
+        MockAggregator next = new MockAggregator();
+        vm.recordLogs();
+        proxyWeth.confirmAggregator(next);
+        _relayAll();
+        assertEq(rc.feeds(0), address(next));
+        assertEq(rc.aggregatorSwitches(), 1);
+        assertEq(sys.unsubscriptions(), 1);
+
+        // prices now come from the new aggregator, and the old one is ignored
+        _movePrice(1900e8);
+        assertEq(rc.lastPrice(0), 1900e8);
+        IReactive.LogRecord memory l;
+        l.chainId = ORIGIN;
+        l.contractAddress = address(aggWeth);
+        l.topic0 = rc.ANSWER_UPDATED_TOPIC();
+        l.topic1 = 1e8;
+        l.data = abi.encode(block.timestamp);
+        vm.prank(SYSTEM_ADDR);
+        rc.react(l);
+        assertEq(rc.lastPrice(0), 1900e8);
+    }
+
+    // ---- CRON: sweep and refresh
+
+    function test_cronSweepCatchesALoanLeftUnderItsTrigger() public {
+        _protectAlice(1 ether);
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        _movePrice(1100e8); // inside the cooldown: no request
+        assertEq(sys.callbackCount(), 1);
+        vm.warp(block.timestamp + 11); // cooldown over, but the price stands still
+        _cron();
+        assertEq(rc.cronTicks(), 1);
+        assertEq(sys.callbackCount(), 2, "the sweep found it");
+        _deliverLastCallback();
+        assertGe(_hf(alice), 1.4e18);
+    }
+
+    function test_cronRefreshesStaleMirrorAfterInterest() public {
+        pool.setBorrowRate(2000); // 20% a year
+        _protectAlice(1 ether);
+        (uint128 mirroredDebt,,,,,,,,,,,) = rc.positions(alice);
+        vm.warp(block.timestamp + 30 days);
+        _cron();
+        assertEq(rc.refreshesRequested(), 1);
+        ISystemContract.CallbackConfiguration_V_1_0 memory c = sys.callbackAt(0);
+        assertEq(c.gasLimit, rc.REFRESH_GAS_LIMIT());
+        _deliver(0);
+        (uint128 refreshed,,,,,,,,,,,) = rc.positions(alice);
+        assertGt(refreshed, mirroredDebt, "interest is now in the mirror");
+        assertEq(shield.refreshCount(), 1);
+    }
+
+    // ---- watch fee
+
+    function test_watchFeeChargedWhileProtected() public {
+        LiquidationShield s2 = new LiquidationShield(IPayable(payable(address(proxy))), address(rc), _shieldConfig(0.001 ether));
+        vm.startPrank(alice);
+        weth.approve(address(s2), type(uint256).max);
+        s2.protect(1.15e18, 1.4e18, 1 ether);
+        vm.warp(block.timestamp + 2 days);
+        s2.sync(alice);
+        vm.stopPrank();
+        (uint128 reserve,,,,,,,,) = s2.protections(alice);
+        assertEq(reserve, 1 ether - 0.002 ether);
+        (uint256 rescueFees, uint256 watchFees,,,,) = s2.feeBreakdown();
+        assertEq(watchFees, 0.002 ether);
+        assertEq(rescueFees, 0);
+        assertEq(address(s2).balance, 0.002 ether, "unwrapped to ETH for gas");
+    }
+
+    // ---- DemoLoan: the dashboard's one-click rescue
 
     function _deployDemo() internal returns (DemoLoan demo) {
         vm.recordLogs();
@@ -327,25 +877,46 @@ contract ShieldTest is Test {
         _relayAll();
     }
 
-    function test_demoRunTriggersRescueAndResets() public {
+    function test_demoRunRequestsRescueOnTheFirstStep() public {
         DemoLoan demo = _deployDemo();
         assertEq(_hf(address(demo)), 1.2e18);
 
         for (uint256 r = 1; r <= 3; ++r) {
             uint256 before = sys.callbackCount();
+            uint256 earlyBefore = rc.earlyRequests();
             vm.recordLogs();
             demo.run();
             _relayAll();
             assertEq(sys.callbackCount(), before + 1, "one rescue requested per run");
+            assertEq(rc.earlyRequests(), earlyBefore + 1, "requested at the $1,950 step, before the trigger");
             _deliverLastCallback();
             assertGe(_hf(address(demo)), 1.4e18, "rescued to target");
             vm.warp(block.timestamp + 61);
         }
         // each run returns the previous top-up to the reserve, so over three runs only the fees are spent
-        (uint128 reserve,,,) = shield.protections(address(demo));
         uint256 lastTopUp = pool.collateral(address(demo)) - demo.BASE_COLLATERAL();
-        assertEq(reserve + lastTopUp, 0.003 ether - 3 * 0.0001 ether);
+        assertEq(_reserve(address(demo)) + lastTopUp, 0.003 ether - 3 * 0.0001 ether);
         assertEq(demo.runs(), 3);
+    }
+
+    function test_demoRunInRepayMode() public {
+        DemoLoan demo = _deployDemo();
+        for (uint256 r = 1; r <= 2; ++r) {
+            vm.recordLogs();
+            demo.runWithMode(LiquidationShield.Mode.Repay);
+            _relayAll();
+            _deliverLastCallback();
+            assertGe(_hf(address(demo)), 1.4e18);
+            assertEq(pool.collateral(address(demo)), demo.BASE_COLLATERAL(), "no collateral added");
+            vm.warp(block.timestamp + 61);
+        }
+        // back to top-ups: the repaid debt is borrowed again and returned to the repay reserve
+        vm.recordLogs();
+        demo.run();
+        _relayAll();
+        assertEq(pool.debt(address(demo)), demo.DEBT());
+        _deliverLastCallback();
+        assertGt(pool.collateral(address(demo)), demo.BASE_COLLATERAL());
     }
 
     function test_demoRunHasCooldown() public {
@@ -353,5 +924,11 @@ contract ShieldTest is Test {
         demo.run();
         vm.expectRevert(abi.encodeWithSelector(DemoLoan.TooSoon.selector, block.timestamp + 60));
         demo.run();
+    }
+
+    function test_demoTopUpAddsToReserve() public {
+        DemoLoan demo = _deployDemo();
+        demo.topUp{value: 0.01 ether}();
+        assertEq(_reserve(address(demo)), 0.013 ether);
     }
 }

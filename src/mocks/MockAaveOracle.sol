@@ -1,19 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-/// Aave-style price oracle (USD, 8 decimals) whose price anyone can move, so the demo can simulate a crash.
+import {MockAggregator, MockAggregatorProxy} from "./MockAggregator.sol";
+
+/// Aave-style price oracle (USD, 8 decimals). Like Aave's `AaveOracle`, it reads each asset's price from a
+/// Chainlink-style source; `setAssetPrice` pushes a new answer into that source so the demo can simulate a crash,
+/// and the price event comes from the aggregator (`AnswerUpdated`), as it would on mainnet.
 contract MockAaveOracle {
-    mapping(address => uint256) public prices;
+    mapping(address => MockAggregatorProxy) public sources;
 
-    event AssetPriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
+    event AssetSourceUpdated(address indexed asset, address indexed source);
 
-    function getAssetPrice(address asset) external view returns (uint256) {
-        return prices[asset];
+    /// Testnet only: anyone may point an asset at a source.
+    function setAssetSource(address asset, MockAggregatorProxy source) external {
+        sources[asset] = source;
+        emit AssetSourceUpdated(asset, address(source));
     }
 
+    function getAssetPrice(address asset) external view returns (uint256) {
+        MockAggregatorProxy s = sources[asset];
+        if (address(s) == address(0)) return 0;
+        int256 answer = s.latestAnswer();
+        return answer > 0 ? uint256(answer) : 0;
+    }
+
+    /// Testnet only: anyone may move a price (the dashboard's Run a rescue relies on it).
     function setAssetPrice(address asset, uint256 price) external {
-        require(price > 0, "price=0");
-        prices[asset] = price;
-        emit AssetPriceUpdated(asset, price, block.timestamp);
+        require(price > 0 && price <= uint256(type(int256).max), "bad price");
+        MockAggregatorProxy s = sources[asset];
+        require(address(s) != address(0), "no source");
+        s.aggregator().updateAnswer(int256(price));
     }
 }
