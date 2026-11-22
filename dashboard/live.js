@@ -142,14 +142,14 @@ async function readRescues() {
   set('count', String(count));
   const list = $('rows')[0];
   if (!list || !rescues.length) return;
-  list.replaceChildren(...rescues.slice(0, 12).map((l) => {
+  list.replaceChildren(...rescues.slice(0, 20).map((l) => {
     const [supplied, , before, after, ts] = words(l.data);
     const li = document.createElement('li');
     li.className = 'ui-win__row';
     const mins = Math.max(0, Math.round((Date.now() / 1000 - Number(ts)) / 60));
     li.innerHTML = `<span class="ui-avatar" data-tone="1">R</span><span class="ui-win__who"></span><span class="ui-win__sub"></span><span class="ui-win__st is-done">Rescued</span><span class="ui-win__age"></span>`;
     li.children[1].textContent = String(l.block_number);
-    li.children[2].textContent = `${hf(before)} → ${hf(after)} · ${eth(supplied, 5)} WETH`;
+    li.children[2].innerHTML = `${hf(before)} → ${hf(after)} · <a href="${SCOUT}/tx/${l.transaction_hash}" target="_blank" rel="noopener">${l.transaction_hash.slice(0, 10)}…</a>`;
     li.children[4].textContent = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
     return li;
   }));
@@ -165,15 +165,15 @@ async function readBench() {
   set('summary', `Median of ${summary.rounds} rounds. Fastest ${summary.min.toFixed(1)} s, p90 ${summary.p90.toFixed(1)} s, slowest ${summary.max.toFixed(1)} s.`);
   const list = $('bench')[0];
   const top = Math.max(...rows.map((x) => x.seconds), 1);
+  // each round: its share of the slowest, then the three transactions of the loop and the time end to end
+  const tx = (base, h, label) => h ? `<a class="tx" href="${base}/tx/${h}" target="_blank" rel="noopener" title="${h}">${label} ${h.slice(0, 6)}…</a>` : '<span class="muted">n/a</span>';
   list.replaceChildren(...rows.slice(0, 20).map((x) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span></span><i></i><a class="tx" target="_blank" rel="noopener"></a>`;
+    li.innerHTML = `<span></span><i></i>${tx(SCOUT, x.priceTx, 'Price')}${tx(LASNA_SCAN, x.lasnaTx, 'Lasna')}${tx(SCOUT, x.rescueTx, 'Rescue')}<b></b>`;
     li.children[0].textContent = `Round ${x.round}`;
     li.children[1].style.setProperty('--w', (x.seconds / top * 100).toFixed(1) + '%');
-    const a = li.querySelector('a');
-    a.href = `${SCOUT}/tx/${x.rescueTx}`;
-    a.title = `${x.blocks} Base blocks`;
-    a.textContent = `${x.seconds.toFixed(1)} s`;
+    li.querySelector('b').textContent = `${x.seconds.toFixed(1)} s`;
+    li.querySelector('b').title = `${x.blocks} Base blocks`;
     return li;
   }));
 }

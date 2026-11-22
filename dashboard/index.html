@@ -135,7 +135,11 @@
   .fee-compare { margin-top: var(--s-8); }
   .bars { padding: 24px; display: grid; gap: 16px; align-content: start; height: 100%; font-family: var(--font-text); }
   .bars__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .bars__list li { display: grid; grid-template-columns: 72px 1fr 56px; gap: 12px; align-items: center; font-size: 14px; }
+  .bars__list li { display: grid; grid-template-columns: 64px minmax(40px, 1fr) repeat(3, auto) 44px; gap: 10px; align-items: center; font-size: 14px; }
+  .bars__list b { font: 500 14px var(--font-mono); text-align: right; }
+  .bars__list .tx { font-size: 13px; text-align: left; }
+  .ui-win__sub a { color: inherit; font-family: var(--font-mono); }
+  @media (max-width: 639px) { .bars__list li { grid-template-columns: 64px repeat(3, auto) 1fr; } .bars__list i { display: none; } }
   .bars__list i { display: block; height: 14px; width: var(--w); background: var(--p-ink); }
   .bars__list a { text-align: right; color: var(--p-ink); }
   #speed .panel { --p-h: 560px; }
@@ -226,7 +230,7 @@
         <li data-step="4" data-state="wait"><span class="steps__n">4</span><span class="steps__t">Reactive Network reacts</span><span class="steps__d" data-step-detail>ShieldReactive on Lasna sees the fall at $1,950 and asks for a rescue before the trigger is crossed</span></li>
         <li data-step="5" data-state="wait"><span class="steps__n">5</span><span class="steps__t">Shield rescues the loan</span><span class="steps__d" data-step-detail>Adds collateral or repays debt on Base until the health factor is 1.40</span></li>
       </ol>
-      <div class="ui app fill" role="img" aria-label="Rescue history beside the protected loan's health factor, collateral, debt, reserve and WETH price" data-ui-pause-host>
+      <div class="ui app fill" role="group" aria-label="Rescue history beside the protected loan's health factor, collateral, debt, reserve and WETH price" data-ui-pause-host>
         <div class="app__pane app__pane--list">
           <div class="ui ui-panel ui-win" data-ui="window" data-open="Rescued" data-work="Pending" data-done="Rescued">
             <div class="ui-win__bar">
@@ -314,8 +318,8 @@
           <p class="t-small muted" data-live="summary">Median of the measured rounds</p>
         </div>
         <div class="span-6 start-7">
-          <div class="panel"><div class="ui ui-panel bars" role="img" aria-label="Latency of each benchmark round, in seconds from the price event to the rescue">
-            <span class="pos__note">Seconds from price event to rescue, by round</span>
+          <div class="panel"><div class="ui ui-panel bars" role="group" aria-label="Latency of each benchmark round, in seconds from the price event to the rescue">
+            <span class="pos__note">Each round: price drop on Base, Reactive request on Lasna, rescue on Base, and the time from first to last</span>
             <ul class="bars__list" data-live="bench">
               <li><span>Round 1</span><i style="--w:50%"></i><a class="tx" href="https://base-sepolia.blockscout.com/tx/0x1bc3e1a0e08e9823e6b3ec988a00d0cddfc0b1b75fe74fc9e82d89750e8f184c">2.0 s</a></li>
               <li><span>Round 2</span><i style="--w:35%"></i><a class="tx" href="https://base-sepolia.blockscout.com/tx/0x9ce10614e20ef705b748d1e2f604d406e3d1bbb9868a5a7ae7c6d6a4a1b44595">1.4 s</a></li>
