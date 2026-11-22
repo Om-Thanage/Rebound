@@ -5,15 +5,11 @@
 When a borrower's collateral price drops, an Aave-style loan can be liquidated in the same block: the liquidator
 takes a bonus (5% on WETH in Aave V3). Parapet watches the price feed itself through a Reactive contract and acts
 while the loan is still above 1.0. It requests a rescue when the loan crosses its trigger, or one price step
-earlier when the price is falling fast. The rescue lands about six Base blocks (1.2 s, median of 20 rounds on the
-first version) after the price event, with no keeper bot and no server. It either adds collateral or repays debt,
+earlier when the price is falling fast. The rescue lands about six Base blocks (1.4 s, median of 10 rounds on the
+deployed version) after the price event, with no keeper bot and no server. It either adds collateral or repays debt,
 by the smallest amount that restores the borrower's target. It charges **0.3% of the value it moves** (floor
 0.0001 ETH, gas included). That fee is unwrapped to ETH inside the shield, where Reactive's callback proxy takes
 the callback gas from it, so the destination side runs with no one topping it up.
-
-> **Status.** The code on this branch is ahead of the contracts deployed on testnet. The addresses, transaction
-> hashes and the 1.2 s benchmark below are from the first version (top-ups only, one price feed). Redeploy with
-> `script/deploy.sh`, then re-run `script/bench.sh` and update the tables before submitting.
 
 ## In plain words
 
@@ -181,52 +177,70 @@ liquidated immediately, so a shield must act before HF 1.0; Sevim and Ferreira T
 borrower's side; Qin et al., *Mitigating DeFi Liquidations with Reversible Call Options* (Miqado, FC 2023): outside
 top-ups cut liquidated collateral by 89.8% in simulation.
 
-## Measured on live testnets (first version)
+## Measured on live testnets
 
 `script/bench.sh` resets the loan each round (price back to $2,000, collateral back to HF 1.2), drops WETH to
 $1,800 (HF 1.08, under the 1.15 trigger) and counts Base blocks between the price transaction and the
 `Rescued` event. At 200 ms a block, blocks × 0.2 s is the end-to-end latency. Results:
 [`results/bench.csv`](results/bench.csv), summary in [`results/summary.txt`](results/summary.txt).
 
-| Rounds | Rescued | Median | p90 | Fastest | Slowest | Mean |
+| Version | Rounds | Rescued | Median | p90 | Fastest | Slowest |
 |---|---|---|---|---|---|---|
-| 20 | 20 | **1.2 s** (6 blocks) | 1.6 s | 1.0 s | 2.0 s | 1.35 s |
+| Deployed (v2: modes, Chainlink feeds, lead feed, CRON) | 10 | 10 | **1.4 s** (7 blocks) | 1.8 s | 1.0 s | 2.0 s |
+| First version ([`results/v1/`](results/v1/)) | 20 | 20 | 1.2 s (6 blocks) | 1.6 s | 1.0 s | 2.0 s |
 
-That is six blocks after the price update. Liquidators act in the update's own block, so Parapet's protection
-comes from acting while HF is between the trigger and 1.0, and from the early request when the price is falling
-fast, not from beating liquidators to a loan that is already liquidatable.
+Every rescue lifted the health factor to 1.40. In both runs the reactive contract ran out of lREACT partway
+(Reactive stops calling `react()` while a contract owes it); after a `depositTo` the missing rounds were rerun.
 
-Self-funding, read from `opsLedger()` on Base Sepolia after 23 rescues: **0.0023 ETH in fees against
-0.0000305 ETH of callback gas paid**, about 75 times over.
+That is six or seven blocks after the price update. Liquidators act in the update's own block, so Parapet's
+protection comes from acting while HF is between the trigger and 1.0, and from the early request when the price is
+falling fast, not from beating liquidators to a loan that is already liquidatable.
 
-The reactive side is paid in REACT. The first version used about 0.04 lREACT per rescue cycle (two price events
-and two or three snapshots). At the testnet faucet rate (100 lREACT per ETH) that is 0.0004 ETH, more than the
-0.0001 ETH fee floor. At the mid-November 2026 market price of REACT (about $0.0023) it is about $0.0001, which the
-floor covers many times over. The real mismatch is that watching costs gas on every price event for every loan,
-while rescue fees only come in on rescues. The daily watch fee covers that, and buckets keep the per-event cost
-down to the loans near their trigger. Bridging fee income to REACT and calling `depositTo` is still manual.
+**Lead feed, live:** `script/lead.sh 1900` moved WETH to $1,900 on Ethereum Sepolia first. The rescue landed on
+Base 0.8 s after that update confirmed, **before Base's own oracle had moved** (it followed 10 s later).
 
-## Deployed contracts (first version)
+**Self-funding (Base side),** from `opsLedger()` after 15 rescues: 0.0015 ETH in fees against 0.00003 ETH of
+callback gas, about 50 times over; the shield owes the callback proxy nothing.
+
+**Reactive side, measured:** read from the system contract's `reserves()` for ShieldReactive. Idle, with no price
+moving, it spent nothing over three minutes. One dashboard run (reset, two-step crash: three price events and two
+loan snapshots) cost **0.111 lREACT**; the first version's simpler loop cost about 0.04. At the testnet faucet rate
+(100 lREACT per ETH) 0.111 lREACT is 0.0011 ETH, above the 0.0001 ETH fee floor; at the mid-November 2026 market
+price of REACT (about $0.0023) it is about $0.0003, which the floor covers. Watching costs gas on every price event
+while fees only arrive on rescues; the daily watch fee and the trigger buckets are there for that gap. Bridging fee
+income to REACT and calling `depositTo` is still manual.
+
+## Deployed contracts
 
 | Contract | Network | Address |
 |---|---|---|
-| ShieldReactive | Reactive Lasna (5318007) | [`0x2C7AD06885D413E1dCd9CEa886467D1Bc8f234c4`](https://lasna.reactscan.net/address/0x2C7AD06885D413E1dCd9CEa886467D1Bc8f234c4) |
-| LiquidationShield | Base Sepolia (84532) | [`0x3796897b27240f329b32184f2C2cBd6666A1EeaE`](https://base-sepolia.blockscout.com/address/0x3796897b27240f329b32184f2C2cBd6666A1EeaE) |
-| MockAavePool | Base Sepolia | [`0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c`](https://base-sepolia.blockscout.com/address/0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c) |
-| MockAaveOracle | Base Sepolia | [`0x49074f7961c01416cf5A57d13df664C32fb33345`](https://base-sepolia.blockscout.com/address/0x49074f7961c01416cf5A57d13df664C32fb33345) |
-| Test WETH | Base Sepolia | [`0xac1f5822da429129e15aB706D3888769De7d5cF4`](https://base-sepolia.blockscout.com/address/0xac1f5822da429129e15aB706D3888769De7d5cF4) |
-| DemoLoan | Base Sepolia | [`0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF`](https://base-sepolia.blockscout.com/address/0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF) |
-| Test USDC | Base Sepolia | [`0xA91733b5641d627eD461420D0EC1D1277fC7bF37`](https://base-sepolia.blockscout.com/address/0xA91733b5641d627eD461420D0EC1D1277fC7bF37) |
+| ShieldReactive | Reactive Lasna (5318007) | [`0x49074f7961c01416cf5A57d13df664C32fb33345`](https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345) |
+| LiquidationShield | Base Sepolia (84532) | [`0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc`](https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc) |
+| DemoLoan | Base Sepolia | [`0x3673cE1229C43ac7A64a5E85DB58c1320d5E4573`](https://base-sepolia.blockscout.com/address/0x3673cE1229C43ac7A64a5E85DB58c1320d5E4573) |
+| MockAavePool | Base Sepolia | [`0x7ac6FcF13E42908F78A691B7CaF7Cb55BfD18774`](https://base-sepolia.blockscout.com/address/0x7ac6FcF13E42908F78A691B7CaF7Cb55BfD18774) |
+| MockAaveOracle | Base Sepolia | [`0xB567239e6AE5E9b76462dAE4610335e480263b03`](https://base-sepolia.blockscout.com/address/0xB567239e6AE5E9b76462dAE4610335e480263b03) |
+| WETH/USD feed (aggregator / proxy) | Base Sepolia | [`0x031ED5b46Ff4C9FfDda60Ff7D82Cf933AD8832E9`](https://base-sepolia.blockscout.com/address/0x031ED5b46Ff4C9FfDda60Ff7D82Cf933AD8832E9) |
+|  |  | [`0xA3ebD10CC4ad9dA937fA91225F871f0DAbdcFc61`](https://base-sepolia.blockscout.com/address/0xA3ebD10CC4ad9dA937fA91225F871f0DAbdcFc61) |
+| WBTC/USD feed (aggregator / proxy) | Base Sepolia | [`0xa9D8051F3B51aAFdb4DA61CD36082f4FEc23502F`](https://base-sepolia.blockscout.com/address/0xa9D8051F3B51aAFdb4DA61CD36082f4FEc23502F) |
+|  |  | [`0x6dfa1484b13c95564145226177C9150863B3044F`](https://base-sepolia.blockscout.com/address/0x6dfa1484b13c95564145226177C9150863B3044F) |
+| Test WETH | Base Sepolia | [`0x8C2A82cC3A5f9d1736c3A5bE0Dd2Ef56e1c37A64`](https://base-sepolia.blockscout.com/address/0x8C2A82cC3A5f9d1736c3A5bE0Dd2Ef56e1c37A64) |
+| Test WBTC | Base Sepolia | [`0xc33bc8eD186eD4f9884c8B29243eF5786a9506b8`](https://base-sepolia.blockscout.com/address/0xc33bc8eD186eD4f9884c8B29243eF5786a9506b8) |
+| Test USDC | Base Sepolia | [`0xdB905491F41543EE51c67EEAa4C66b3C927F1C89`](https://base-sepolia.blockscout.com/address/0xdB905491F41543EE51c67EEAa4C66b3C927F1C89) |
+| Lead WETH/USD feed | Ethereum Sepolia (11155111) | [`0x3796897b27240f329b32184f2C2cBd6666A1EeaE`](https://eth-sepolia.blockscout.com/address/0x3796897b27240f329b32184f2C2cBd6666A1EeaE) |
 
-Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`. Source is verified for every Base Sepolia contract (WETH and USDC on Blockscout, the rest on Sourcify as exact matches).
+Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`. Every Base Sepolia and Ethereum
+Sepolia contract above is source-verified on Sourcify (exact match). The first version's addresses are in
+[`deployments.v1.env`](deployments.v1.env).
 
-### Full-loop transactions (origin event → callback), first version
+### Full-loop transactions (origin event → callback)
 
-| Loop | 1. Price event (Base) | 2. Reactive tx, `RescueRequested` (Lasna) | 3. Rescue callback (Base) | Base blocks |
+| Loop | 1. Price event | 2. Reactive tx, `RescueRequested` (Lasna) | 3. Rescue callback (Base) | Latency |
 |---|---|---|---|---|
-| First demo | [`0xf6f1…a0a1`](https://base-sepolia.blockscout.com/tx/0xf6f1125010fd6c7a747a805c6ffcfb2213528ccaae164375cc3b1d57bbf5a0a1) | [`0x6020…31e8`](https://lasna.reactscan.net/tx/0x60208ef509b0422ba7f391a0ca7afe31105f97f17d9d7012bf9803bfa00d31e8) | [`0x1bc3…184c`](https://base-sepolia.blockscout.com/tx/0x1bc3e1a0e08e9823e6b3ec988a00d0cddfc0b1b75fe74fc9e82d89750e8f184c) | 10 (2.0 s) |
-| Second demo | [`0xc11e…bf5c`](https://base-sepolia.blockscout.com/tx/0xc11e446208d96d23c5269fb41a6ee02926fc79131bdf6482d4ea7a8b3f41bf5c) | [`0x623c…1d19`](https://lasna.reactscan.net/tx/0x623c91ab32597e1639392160e76dc536aa5f30156ed98d5bf4ab860619341d19) | [`0x9ce1…4595`](https://base-sepolia.blockscout.com/tx/0x9ce10614e20ef705b748d1e2f604d406e3d1bbb9868a5a7ae7c6d6a4a1b44595) | 7 (1.4 s) |
-| First `DemoLoan.run()` | [`0x76b6…77ab`](https://base-sepolia.blockscout.com/tx/0x76b6fcfae1e3420008758f92a8cc1d972cc7ac0a4083821ca3c36c3dc77877ab) | [`0x21cd…a413`](https://lasna.reactscan.net/tx/0x21cd56036006de8889f7fa787347620f10e852f14a2beccf5241a622e3bfa413) | [`0xb1b4…0056`](https://base-sepolia.blockscout.com/tx/0xb1b4cf4a96a58c32ed501b2760a73c5fb00c0b84d70df3f1628b3a99c2830056) | 7 (1.4 s) |
+| Benchmark round 1 | [`0xc7b6…0d14`](https://base-sepolia.blockscout.com/tx/0xc7b6d70fdd1a7b961f8c3cd915a923689714dffc34f286c9f69855e47e700d14) (Base) | [`0xc757…3cc5`](https://lasna.reactscan.net/tx/0xc75778c818a2b2e1d7c7af4b3ef250a2dcc851022e3cdb72ba52e6c9b6553cc5) | [`0x34b9…b1a5`](https://base-sepolia.blockscout.com/tx/0x34b91002ac5e5a366c38e80e24577dea8fd01cc249181bb13b1cb9eaa539b1a5) | 7 Base blocks (1.4 s) |
+| `DemoLoan.run()` | [`0x1f7e…5a8b`](https://base-sepolia.blockscout.com/tx/0x1f7e5f72f4901f94db6f8018bb5387a5fbd7cf317893c608bc362e53b5df5a8b) (Base) | [`0xf1cf…a143`](https://lasna.reactscan.net/tx/0xf1cfd91ca05bf014bdc17e54e0e92aa57cc809660bdd57b7491d8f993a63a143) | [`0x1cbc…38a1`](https://base-sepolia.blockscout.com/tx/0x1cbcd781c93fd51dc52f0115e12f2a2d5b242ef33db740913708ce81002f38a1) | 10 Base blocks (2.0 s) |
+| Lead feed | [`0x3205…cd00`](https://eth-sepolia.blockscout.com/tx/0x3205623dc5126c391c9201481ea3140c61edffeabd4f79dcf3a886f67465cd00) (Ethereum Sepolia) | [`0xd442…e33e`](https://lasna.reactscan.net/tx/0xd442247264309eb66b637cfbf690b1ae017007e71b80610a38f85ecc1d60e33e) | [`0x8b47…9205`](https://base-sepolia.blockscout.com/tx/0x8b4712bdb4e198c7da3111e8bfd2a3a1347182c691e41a740ee0e6dadfc29205) | before Base's oracle moved |
+
+Every benchmark round's price and rescue transactions are in `results/bench.csv`.
 
 ## Run it yourself
 
@@ -253,10 +267,10 @@ Base Sepolia's and Lasna's public RPCs and the `Rescued` events from Blockscout,
 | The brief asks for | Where it is |
 |---|---|
 | Public repository | this repository (MIT licence for our code; libraries keep their own) |
-| Deployed contract addresses | [Deployed contracts](#deployed-contracts-first-version), all source-verified; redeploy pending for this version |
-| Transaction hashes for the full loop, origin event to callback | [Full-loop transactions](#full-loop-transactions-origin-event--callback-first-version) |
+| Deployed contract addresses | [Deployed contracts](#deployed-contracts), all source-verified |
+| Transaction hashes for the full loop, origin event to callback | [Full-loop transactions](#full-loop-transactions-origin-event--callback) |
 | Demo video under three minutes | link to be added |
-| Track: Every Second Counts on Base Sepolia | Reactive Lasna + Base Sepolia; latency in [Measured on live testnets](#measured-on-live-testnets-first-version) |
+| Track: Every Second Counts on Base Sepolia | Reactive Lasna + Base Sepolia; latency in [Measured on live testnets](#measured-on-live-testnets) |
 | Built during the event | every commit is from November 2026, inside the event; `forge-std` and `reactive-lib-omni` are dependencies |
 | Timestamps, not block counts, for timers on Base | the shield's 10 s cooldown, the 60 s pending timeout and DemoLoan's 60 s cooldown use timestamps |
 
