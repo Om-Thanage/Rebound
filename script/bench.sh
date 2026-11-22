@@ -8,7 +8,7 @@
 # Usage: bash script/bench.sh [rounds]   (needs an open, protected position: run demo.sh once first)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; . ./.env; . ./deployments.env; set +a
+set -a; . "${ENV_FILE:-./.env}"; . ./deployments.env; set +a
 ROUNDS=${1:-20}
 START=${START:-1} # first round number, to continue an earlier run
 B="--rpc-url $BASE_SEPOLIA_RPC --private-key $PRIVATE_KEY"
@@ -18,13 +18,13 @@ mkdir -p results
 [ -f "$OUT" ] || echo "round,price_tx,price_block,request_lasna_block,rescue_tx,rescue_block,blocks,end_to_end_s,to_reactive_s,hf_after" > "$OUT"
 
 RESCUED=$(cast keccak "Rescued(address,uint256,uint256,uint256,uint256,uint256)")
-REQUESTED=$(cast keccak "RescueRequested(address,uint256,uint256)")
+REQUESTED=$(cast keccak "RescueRequested(address,uint256,uint256,uint256)")
 BASE_COLL=4000000000000000 # 0.004 WETH = HF 1.2 at $2000 with 5.5 USDC debt
 
 send() { cast send "$@" $B > /dev/null; }
 field() { jq -r "$1" 2>/dev/null || true; }
 coll() { cast call "$POOL" "collateral(address)(uint256)" "$DEPLOYER" --rpc-url "$BASE_SEPOLIA_RPC" | awk '{print $1}'; }
-mirrored_coll() { cast call "$REACTIVE" "positions(address)(uint128,uint128,uint32,uint64,bool,bool,bool)" "$DEPLOYER" $R | sed -n 1p | awk '{print $1}'; }
+mirrored_coll() { cast call "$REACTIVE" "collateralOf(address,uint256)(uint256)" "$DEPLOYER" 0 $R | awk '{print $1}'; }
 logs() { # chain-rpc from to address topic -> first matching log as compact JSON, or nothing
   cast logs --from-block "$2" --to-block "$3" --address "$4" "$5" --rpc-url "$1" --json 2>/dev/null \
     | jq -c '(if type == "object" then .data else . end) | if type == "array" then (.[0] // empty) else empty end' 2>/dev/null || true

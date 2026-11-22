@@ -555,6 +555,37 @@ contract ShieldTest is Test {
         assertGe(_hf(bob), 1.4e18, "ready for the Base update when it lands");
     }
 
+    /// The lead chain's clock can lag Base's; a lead event stamped before the shield's cooldown ended still counts
+    /// as "now" in Base time.
+    function test_leadFeedUsesOriginClockWhenLeadClockLags() public {
+        _movePrice(2000e8); // Base time is now
+        // bob's mirror: 1 WETH, $1,400 debt (HF 1.18 at $2,000), and a cooldown that ended 5 s ago in Base time
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 1 ether;
+        uint256[] memory lts = new uint256[](2);
+        lts[0] = 8250;
+        lts[1] = 7800;
+        IReactive.LogRecord memory snap;
+        snap.chainId = ORIGIN;
+        snap.contractAddress = address(shield);
+        snap.topic0 = rc.SNAPSHOT_TOPIC();
+        snap.topic1 = uint256(uint160(bob));
+        snap.data = abi.encode(amounts, lts, uint256(1400e8), uint256(1.15e18), block.timestamp - 5, true);
+        vm.prank(SYSTEM_ADDR);
+        rc.react(snap);
+
+        // the lead chain's clock is five minutes behind: in its own time, the cooldown hasn't ended yet
+        IReactive.LogRecord memory l;
+        l.chainId = LEAD;
+        l.contractAddress = address(aggLead);
+        l.topic0 = rc.ANSWER_UPDATED_TOPIC();
+        l.topic1 = 1900e8;
+        l.data = abi.encode(block.timestamp - 300);
+        vm.prank(SYSTEM_ADDR);
+        rc.react(l);
+        assertEq(sys.callbackCount(), 1, "judged in Base time, the cooldown is over");
+    }
+
     function test_leadFeedAboveBasePriceDoesNothing() public {
         _movePrice(2000e8);
         _protectAlice(1 ether);

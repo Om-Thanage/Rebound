@@ -1,10 +1,11 @@
 // Live data for the dashboard: reads the shield, the pool and the oracle on Base Sepolia over JSON-RPC,
 // the shield's Rescued events from Blockscout, and the benchmark from data/bench.json.
-const RPC = 'https://sepolia.base.org';
+let RPC = 'https://sepolia.base.org';
 const SCOUT = 'https://base-sepolia.blockscout.com';
-const LASNA = 'https://lasna-rpc.rnk.dev/';
+let LASNA = 'https://lasna-rpc.rnk.dev/';
 const LASNA_SCAN = 'https://lasna.reactscan.net';
-const REACTIVE = '0x2C7AD06885D413E1dCd9CEa886467D1Bc8f234c4';
+let REACTIVE = '0x2C7AD06885D413E1dCd9CEa886467D1Bc8f234c4';
+// Addresses of the live deployment; data/deployment.json (written by script/export-deployment.mjs) overrides them.
 const A = {
   user: '0x0d3d64fe02614136e92aB630E8BF9Db3E2E22BdF', // DemoLoan: the loan visitors crash with Run a rescue
   weth: '0xac1f5822da429129e15aB706D3888769De7d5cF4',
@@ -12,8 +13,25 @@ const A = {
   pool: '0x398ED21C0F95cb4F5c444CAe0F9EeB07b1689e5c',
   shield: '0x3796897b27240f329b32184f2C2cBd6666A1EeaE',
 };
-const SEL = { account: '0xbf92857c', price: '0xb3596f07', prot: '0x613e3fc0', ledger: '0x30b7c49f', collateral: '0xa5fdc5de', debt: '0x9b6c56ec', count: '0x98e78023', run: '0xc0406226', wait: '0xccca123b' };
+const SEL = { account: '0xbf92857c', price: '0xb3596f07', prot: '0x613e3fc0', ledger: '0x30b7c49f', collateral: '0xa5fdc5de', debt: '0x9b6c56ec', count: '0x98e78023', run: '0xc0406226', wait: '0xccca123b',
+  breakdown: '0x46332ee4', mode: '0x295a5212', runWithMode: '0x6a99d796',
+  ticks: '0x36ff1f66', checked: '0x82b26947', requested: '0xb8c1e462', early: '0x3a9b9e03', cron: '0x0ba10b24', users: '0x07973ccf' };
 const RESCUED = '0x28b6c2526f0d05eac057487199a229c2584389d09c1a5b014dcf02610fdd8419';
+const DETAIL = '0xd6a7d2fcb36c3966223a7015df24966d5b6b9a16ae2770e4708df14e86565b3f'; // RescueDetail: repaid debt, hint
+const MODES = ['Collateral', 'Repay', 'Combined'];
+let demoMode = 0; // the mode the visitor picked for the next run
+
+async function loadDeployment() {
+  try {
+    const r = await fetch('data/deployment.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const k of Object.keys(A)) if (d[k]) A[k] = d[k];
+    if (d.reactive) REACTIVE = d.reactive;
+    if (d.rpc) RPC = d.rpc; // lets the page run against a local test chain
+    if (d.lasnaRpc) LASNA = d.lasnaRpc;
+  } catch { /* keep the built-in addresses */ }
+}
 
 const $ = (k) => document.querySelectorAll(`[data-live="${k}"]`);
 const set = (k, v) => $(k).forEach((el) => { el.textContent = v; });
@@ -22,8 +40,8 @@ const words = (hex) => (hex.slice(2).match(/.{64}/g) || []).map((w) => BigInt('0
 const eth = (wei, d = 6) => (Number(wei) / 1e18).toFixed(d);
 const hf = (v) => (v > 10n ** 30n ? '∞' : (Number(v) / 1e18).toFixed(2));
 
-async function call(to, data) {
-  const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' },
+async function call(to, data, url = RPC) {
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }) });
   const j = await r.json();
   if (j.error) throw new Error(j.error.message);
@@ -31,32 +49,87 @@ async function call(to, data) {
 }
 
 async function readLoan() {
-  const [acct, [price], prot, ledger, [coll], [debt]] = await Promise.all([
+  const [acct, [price], prot, [coll], [debt]] = await Promise.all([
     call(A.pool, SEL.account + arg(A.user)),
     call(A.oracle, SEL.price + arg(A.weth)),
     call(A.shield, SEL.prot + arg(A.user)),
-    call(A.shield, SEL.ledger),
     call(A.pool, SEL.collateral + arg(A.user)),
     call(A.pool, SEL.debt + arg(A.user)),
   ]);
   const h = acct[5];
+  set('who', `Demo loan ${A.user.slice(0, 6)}…${A.user.slice(-4)}`);
   set('hf', hf(h));
   set('price', '$' + (Number(price) / 1e8).toLocaleString('en-US', { maximumFractionDigits: 0 }));
   set('coll', eth(coll, 4) + ' WETH');
   set('debt', (Number(debt) / 1e6).toFixed(2) + ' USDC');
   set('reserve', eth(prot[0], 4) + ' WETH');
+  // the current shield returns 9 words (reserve, repay reserve, trigger, target, step, last, paid, mode, mirrored)
+  const mode = prot.length >= 9 ? Number(prot[7]) : 0;
+  if (prot.length >= 9) {
+    set('repay-reserve', (Number(prot[1]) / 1e6).toFixed(2) + ' USDC');
+    set('mode', MODES[mode] || '–');
+  }
+  set('cover', coverNote(acct, price, prot, mode));
   // the gauge runs from HF 0.5 to 2.0; the trigger (1.15) and target (1.40) marks sit at 43% and 60%
   const pct = Math.max(0, Math.min(100, ((Number(h) / 1e18) - 0.5) / 1.5 * 100));
   $('gauge').forEach((el) => { el.style.width = (h > 10n ** 30n ? 100 : pct) + '%'; });
 
-  const [fees, seed, gas, , owed] = ledger;
-  set('fees', eth(fees) + ' ETH');
-  set('gas', eth(gas) + ' ETH');
-  set('seed', eth(seed) + ' ETH');
-  set('owed', eth(owed) + ' ETH');
-  set('ratio', gas > 0n ? Math.round(Number(fees) / Number(gas)) + '×' : 'no gas yet');
-  $('gasbar').forEach((el) => { el.style.width = (fees > 0n ? Math.max(1, Number(gas) * 100 / Number(fees)) : 0) + '%'; });
   set('updated', 'Updated ' + new Date().toLocaleTimeString('en-GB'));
+  await readLedger();
+}
+
+// The fee ledger is read on its own, so a failing call there can't blank the loan panel.
+async function readLedger() {
+  const ledger = await call(A.shield, SEL.ledger).catch((e) => { console.warn('live data: ledger', e.message); return null; });
+  if (ledger) {
+    const [fees, seed, gas, , owed] = ledger;
+    set('fees', eth(fees) + ' ETH');
+    set('gas', eth(gas) + ' ETH');
+    set('seed', eth(seed) + ' ETH');
+    set('owed', eth(owed) + ' ETH');
+    set('ratio', gas > 0n ? Math.round(Number(fees) / Number(gas)) + '×' : 'no gas yet');
+    $('gasbar').forEach((el) => { el.style.width = (fees > 0n ? Math.max(1, Number(gas) * 100 / Number(fees)) : 0) + '%'; });
+  }
+
+  const breakdown = await call(A.shield, SEL.breakdown).catch(() => null);
+  if (breakdown) {
+    const [, watch, rescues, skipped] = breakdown;
+    set('watch', eth(watch) + ' ETH');
+    set('skipped', `${skipped} of ${rescues + skipped}`);
+  }
+}
+
+/// Would the reserve still reach the 1.40 target if WETH fell another 20% from here?
+function coverNote(acct, price, prot, mode) {
+  const [collBase, debtBase, , lt] = acct.map(Number);
+  if (!debtBase || !lt || !price) return '';
+  const p = Number(price) * 0.8;
+  const coll = collBase * 0.8;
+  if (mode === 1 && prot.length >= 9) {
+    const need = Math.max(0, debtBase - coll * lt / 1.4e4) / 1e8; // USD of debt to repay
+    const have = Number(prot[1]) / 1e6;
+    return have >= need ? `Repay reserve covers a further 20% drop (needs ${need.toFixed(2)} USDC).`
+      : `Repay reserve would fall short after a further 20% drop: needs ${need.toFixed(2)} USDC.`;
+  }
+  const needBase = Math.max(0, 1.4 * debtBase * 1e4 / lt - coll);
+  const needWeth = needBase / p;
+  const have = Number(prot[0]) / 1e18;
+  return have >= needWeth ? `Reserve covers a further 20% drop (needs ${needWeth.toFixed(4)} WETH).`
+    : `Reserve would fall short after a further 20% drop: needs ${needWeth.toFixed(4)} WETH.`;
+}
+
+/// What the reactive contract on Lasna has done: its own counters and its lREACT balance.
+async function readReactive() {
+  const lasna = (sel) => call(REACTIVE, sel, LASNA).then((w) => w[0]);
+  const [ticks, checked, requested, early, cron, users] = await Promise.all(
+    [SEL.ticks, SEL.checked, SEL.requested, SEL.early, SEL.cron, SEL.users].map(lasna));
+  const bal = BigInt(await rpcAt(LASNA, 'eth_getBalance', [REACTIVE, 'latest']));
+  set('ticks', String(ticks));
+  const watched = `${users} ${users === 1n ? 'loan' : 'loans'} watched`;
+  set('checked', ticks > 0n ? `${(Number(checked) / Number(ticks)).toFixed(1)} per event, ${watched}` : watched);
+  set('requested', `${requested} (${early} early)`);
+  set('cron', String(cron));
+  set('lreact', eth(bal, 3) + ' lREACT');
 }
 
 async function readRescues() {
@@ -105,13 +178,24 @@ async function readBench() {
 }
 
 const safe = (f) => f().catch((e) => console.warn('live data:', e.message));
-safe(readBench);
-safe(readRescues);
-safe(readLoan);
-setInterval(() => { safe(readLoan); safe(readRescues); }, 10_000);
+loadDeployment().then(async () => {
+  safe(readBench);
+  safe(readRescues);
+  safe(readLoan);
+  safe(readReactive);
+  setInterval(() => { safe(readLoan); safe(readRescues); safe(readReactive); }, 10_000);
+  // the mode picker only shows when the deployed DemoLoan supports repay runs
+  const hasModes = await call(A.user, SEL.mode).then(() => true).catch(() => false);
+  document.querySelectorAll('[data-mode-pick]').forEach((el) => { el.hidden = !hasModes; });
+});
+document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
+  demoMode = Number(b.dataset.mode);
+  document.querySelectorAll('[data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+}));
 
 // ---- Run a rescue: the visitor's wallet calls DemoLoan.run(); the five steps on the page follow the loop
-const REQUESTED = '0x11bf528550762ffe2ec8d7042a7a73745fee05cf5c591d410772107182d413e0'; // RescueRequested on Lasna
+const REQUESTED = '0x831e6fe83ba01a4c7028ae204aa408895d0122a5656622d38f09941a22543423'; // RescueRequested(user, hf, price, hint) on Lasna
+const usd = (v) => '$' + (Number(v) / 1e8).toLocaleString('en-US', { maximumFractionDigits: 0 });
 const CHAIN = { chainId: '0x14a34', chainName: 'Base Sepolia', rpcUrls: [RPC],
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, blockExplorerUrls: [SCOUT] };
 const status = (html) => document.querySelectorAll('[data-run-status]').forEach((el) => { el.innerHTML = html; });
@@ -166,7 +250,8 @@ async function runRescue() {
     step(2, 'now', 'Confirm in your wallet: DemoLoan.run(), no tokens or approvals');
     status('Step 2 of 5: confirm the transaction in your wallet.');
     const lasnaFrom = Number(await rpcAt(LASNA, 'eth_blockNumber', [])) - 2;
-    const hash = await wallet.request({ method: 'eth_sendTransaction', params: [{ from, to: A.user, data: SEL.run }] });
+    const data = demoMode === 0 ? SEL.run : SEL.runWithMode + demoMode.toString(16).padStart(64, '0');
+    const hash = await wallet.request({ method: 'eth_sendTransaction', params: [{ from, to: A.user, data }] });
     step(2, 'done', `Sent ${txLink(hash, short(hash))}`);
 
     n = 3;
@@ -176,7 +261,7 @@ async function runRescue() {
     for (let i = 0; i < 120 && !receipt; i++) { receipt = await rpc('eth_getTransactionReceipt', [hash]); if (!receipt) await sleep(500); }
     if (!receipt || receipt.status !== '0x1') throw new Error('the transaction did not go through');
     const start = Number(receipt.blockNumber);
-    step(3, 'done', `WETH at $1,800 in block ${txLink(hash, start)}. Health factor 1.20 to 1.08, under the 1.15 trigger`);
+    step(3, 'done', `WETH $1,950 then $1,800 in block ${txLink(hash, start)}. Health factor 1.20, 1.17, then 1.08`);
     safe(readLoan);
 
     n = 4;
@@ -193,7 +278,11 @@ async function runRescue() {
         const req = await rpcAt(LASNA, 'eth_getLogs', [{ address: REACTIVE, topics: [REQUESTED, userTopic], fromBlock: hex(lasnaFrom), toBlock: hex(head) }]);
         if (req.length) {
           requested = true;
-          step(4, 'done', `ShieldReactive asked for a rescue in Lasna block ${link(`${LASNA_SCAN}/block/${Number(req[0].blockNumber)}`, Number(req[0].blockNumber))}`);
+          const [reqHf, reqPrice, hint] = words(req[0].data);
+          const why = hint > 0n
+            ? `at ${usd(reqPrice)}, before the trigger: HF ${hf(reqHf)} if the fall continues to ${usd(hint)}`
+            : `at ${usd(reqPrice)}, HF ${hf(reqHf)}`;
+          step(4, 'done', `ShieldReactive asked for a rescue ${why}, in Lasna block ${link(`${LASNA_SCAN}/block/${Number(req[0].blockNumber)}`, Number(req[0].blockNumber))}`);
         }
       }
       const head = Number(await rpc('eth_blockNumber', []));
@@ -202,7 +291,12 @@ async function runRescue() {
         const blocks = Number(logs[0].blockNumber) - start;
         const [supplied, fee, , after] = words(logs[0].data);
         if (!requested) step(4, 'done', 'ShieldReactive asked for a rescue on Lasna');
-        step(5, 'done', `Added ${eth(supplied, 5)} WETH, fee ${eth(fee, 4)}. Health factor ${hf(after)}, ${blocks} blocks (${(blocks * 0.2).toFixed(1)} s) after the drop. ${txLink(logs[0].transactionHash, 'Rescue tx')}`);
+        const rcpt = await rpc('eth_getTransactionReceipt', [logs[0].transactionHash]);
+        const detail = (rcpt?.logs || []).find((x) => x.topics?.[0] === DETAIL);
+        const repaid = detail ? words(detail.data)[0] : 0n;
+        const what = [supplied > 0n ? `added ${eth(supplied, 5)} WETH` : '', repaid > 0n ? `repaid ${(Number(repaid) / 1e6).toFixed(2)} USDC` : '']
+          .filter(Boolean).join(' and ');
+        step(5, 'done', `${what.charAt(0).toUpperCase() + what.slice(1)}, fee ${eth(fee, 4)}. Health factor ${hf(after)}, ${blocks} blocks (${(blocks * 0.2).toFixed(1)} s) after the drop. ${txLink(logs[0].transactionHash, 'Rescue tx')}`);
         status(`Rescued ${(blocks * 0.2).toFixed(1)} s after the price drop. The loan on the right is safe again.`);
         safe(readLoan); safe(readRescues);
         return;

@@ -3,7 +3,7 @@
 # Usage: bash script/demo.sh [crash_price_usd]   (default 1800; run deploy.sh first)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; . ./.env; . ./deployments.env; set +a
+set -a; . "${ENV_FILE:-./.env}"; . ./deployments.env; set +a
 CRASH=${1:-1800}
 B="--rpc-url $BASE_SEPOLIA_RPC --private-key $PRIVATE_KEY"
 send() { cast send "$@" $B > /dev/null; }
@@ -21,9 +21,9 @@ if [ "$(cast call "$POOL" "debt(address)(uint256)" "$DEPLOYER" --rpc-url "$BASE_
   send "$SHIELD" "protect(uint64,uint64,uint256)" 1150000000000000000 1400000000000000000 4000000000000000
   echo -n "Waiting for the reactive contract to mirror the position"
   for _ in $(seq 1 30); do
-    active=$(cast call "$REACTIVE" "positions(address)(uint128,uint128,uint32,uint64,bool,bool,bool)" "$DEPLOYER" --rpc-url "$REACTIVE_LASNA_RPC" | sed -n 5p)
-    [ "$active" = "true" ] && break; echo -n "."; sleep 2
-  done; echo " $active"
+    mirrored=$(cast call "$REACTIVE" "collateralOf(address,uint256)(uint256)" "$DEPLOYER" 0 --rpc-url "$REACTIVE_LASNA_RPC" | awk '{print $1}')
+    [ "$mirrored" != "0" ] && break; echo -n "."; sleep 2
+  done; echo " mirrored collateral $mirrored"
 fi
 
 echo "HF before crash: $(hf)"
@@ -49,5 +49,7 @@ echo "rescue tx $(echo "$log" | jq -r .transactionHash) (block $rescue_block)"
 echo "latency: $((rescue_block - crash_block)) Base blocks, $((rescue_ts - crash_ts))s by block timestamps, ${wall}s wall clock (incl. polling)"
 echo "HF after rescue: $(hf)"
 echo "ops ledger (fees, outside funding, gas paid, balance, debt):"
-cast call "$SHIELD" "opsLedger()(uint256,uint256,uint256,uint256,uint256)" --rpc-url "$BASE_SEPOLIA_RPC"
+cast call "$SHIELD" "opsLedger()(uint256,uint256,uint256,uint256,uint256)" --rpc-url "$BASE_SEPOLIA_RPC" || echo "(unavailable: no callback proxy at this address)"
+echo "fee breakdown (rescue fees, watch fees, rescues, skipped callbacks, feeless rescues, refreshes):"
+cast call "$SHIELD" "feeBreakdown()(uint256,uint256,uint256,uint256,uint256,uint256)" --rpc-url "$BASE_SEPOLIA_RPC"
 echo "$crash_tx,$(echo "$log" | jq -r .transactionHash),$((rescue_block - crash_block)),$((rescue_ts - crash_ts)),$wall" >> results.csv

@@ -77,6 +77,7 @@ contract ShieldReactive is AbstractReactive {
     mapping(address => uint256) public feedAsset; // aggregator => asset index + 1
     mapping(address => uint256) public proxyAsset; // proxy => asset index + 1
     uint256 public lastLeadPrice;
+    uint256 public lastOriginAt; // latest origin-chain timestamp seen; cooldowns and timeouts are in origin time
 
     mapping(address => Position) public positions;
     mapping(address => uint256[]) internal collateral;
@@ -234,6 +235,7 @@ contract ShieldReactive is AbstractReactive {
 
     function _onPrice(uint256 asset, uint256 price, uint256 at) internal {
         if (price == 0) return;
+        if (at > lastOriginAt) lastOriginAt = at;
         priceTicks++;
         uint256 last = lastPrice[asset];
         lastPrice[asset] = price;
@@ -255,6 +257,7 @@ contract ShieldReactive is AbstractReactive {
 
     function _onLeadPrice(uint256 leadPrice, uint256 at) internal {
         if (leadPrice == 0) return;
+        if (lastOriginAt > at) at = lastOriginAt; // the lead chain's clock may lag the origin chain's
         leadTicks++;
         lastLeadPrice = leadPrice;
         uint256 price = lastPrice[leadAsset];

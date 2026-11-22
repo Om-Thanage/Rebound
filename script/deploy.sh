@@ -1,29 +1,51 @@
 #!/usr/bin/env bash
-# Deploys the mock Aave market + LiquidationShield on Base Sepolia and ShieldReactive on Reactive Lasna.
-# The two contracts reference each other, so both addresses are predicted from the deployer's nonces first.
-# Usage: bash script/deploy.sh   (reads PRIVATE_KEY and RPC URLs from .env, writes deployments.env)
+# Deploys the mock Aave market (two collateral assets, Chainlink-style feeds) + LiquidationShield + DemoLoan on
+# Base Sepolia, an optional lead price feed on a second chain, and ShieldReactive on Reactive Lasna.
+# The shield and the reactive contract reference each other, so every address is predicted from nonces first.
+# Usage: bash script/deploy.sh   (reads PRIVATE_KEY and RPC URLs from .env, or from $ENV_FILE; writes deployments.env)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; . ./.env; set +a
+set -a; . "${ENV_FILE:-./.env}"; set +a
 
-BASE_CHAIN_ID=84532
+BASE_CHAIN_ID=${BASE_CHAIN_ID:-84532}
+LEAD_CHAIN_ID=${LEAD_CHAIN_ID:-11155111}      # Ethereum Sepolia; set LEAD_RPC= (empty) to skip the lead feed
+LEAD_RPC=${LEAD_RPC-${ETHEREUM_SEPOLIA_RPC:-}}
 DEPLOYER=$(cast wallet address --private-key "$PRIVATE_KEY")
 SHIELD_SEED=${SHIELD_SEED:-0.002ether}       # covers callback gas until the first fees arrive
 REACTIVE_FUNDING=${REACTIVE_FUNDING:-1ether} # lREACT for the reactive contract's own execution
 FEE_BPS=${FEE_BPS:-30}
 MIN_FEE_WEI=${MIN_FEE_WEI:-100000000000000}  # 0.0001 ETH
+WATCH_FEE_WEI_PER_DAY=${WATCH_FEE_WEI_PER_DAY:-10000000000000} # 0.00001 ETH a day per protected loan
+CRON_EVENT=${CRON_EVENT:-Cron100}            # system contract CRON event; Cron100 fires every 100 Reactive blocks
+DEMO_RESERVE=${DEMO_RESERVE:-3000000000000000} # 0.003 WETH; DemoLoan also takes 0.004 WETH of collateral
+WETH_BUCKET=${WETH_BUCKET:-1000000000}       # $10 trigger-price buckets for WETH (8 decimals)
+WBTC_BUCKET=${WBTC_BUCKET:-25000000000}      # $250 for WBTC
 
 base_nonce=$(cast nonce "$DEPLOYER" --rpc-url "$BASE_SEPOLIA_RPC")
 lasna_nonce=$(cast nonce "$DEPLOYER" --rpc-url "$REACTIVE_LASNA_RPC")
-addr() { cast compute-address "$DEPLOYER" --nonce "$1" | awk '{print $NF}'; }
+addr() { cast compute-address "$1" --nonce "$2" | awk '{print $NF}'; }
 
-WETH=$(addr $((base_nonce)))
-USDC=$(addr $((base_nonce + 1)))
-ORACLE=$(addr $((base_nonce + 2)))
-POOL=$(addr $((base_nonce + 3)))
-SHIELD=$(addr $((base_nonce + 4)))
-REACTIVE=$(addr $((lasna_nonce)))
-echo "predicted: WETH=$WETH USDC=$USDC ORACLE=$ORACLE POOL=$POOL SHIELD=$SHIELD REACTIVE=$REACTIVE"
+WETH=$(addr "$DEPLOYER" $((base_nonce)))
+USDC=$(addr "$DEPLOYER" $((base_nonce + 1)))
+WBTC=$(addr "$DEPLOYER" $((base_nonce + 2)))
+ORACLE=$(addr "$DEPLOYER" $((base_nonce + 3)))
+AGG_WETH=$(addr "$DEPLOYER" $((base_nonce + 4)))
+AGG_WBTC=$(addr "$DEPLOYER" $((base_nonce + 5)))
+PROXY_WETH=$(addr "$DEPLOYER" $((base_nonce + 6)))
+PROXY_WBTC=$(addr "$DEPLOYER" $((base_nonce + 7)))
+POOL=$(addr "$DEPLOYER" $((base_nonce + 8)))
+SHIELD=$(addr "$DEPLOYER" $((base_nonce + 9)))
+AWETH=$(addr "$POOL" 1) # the pool creates one aToken per collateral asset: WETH in its constructor,
+AWBTC=$(addr "$POOL" 2) # WBTC when it is listed
+REACTIVE=$(addr "$DEPLOYER" $((lasna_nonce)))
+LEAD_AGG=0x0000000000000000000000000000000000000000
+LEAD_ID=0
+if [ -n "$LEAD_RPC" ]; then
+  LEAD_AGG=$(addr "$DEPLOYER" "$(cast nonce "$DEPLOYER" --rpc-url "$LEAD_RPC")")
+  LEAD_ID=$LEAD_CHAIN_ID
+fi
+CRON_TOPIC=$(cast keccak "${CRON_EVENT}(uint256)")
+echo "predicted: SHIELD=$SHIELD REACTIVE=$REACTIVE POOL=$POOL ORACLE=$ORACLE AGG_WETH=$AGG_WETH LEAD_AGG=$LEAD_AGG"
 
 create() { # rpc, contract, [extra args...]; prints the deployed address
   local rpc=$1 contract=$2; shift 2
@@ -31,30 +53,60 @@ create() { # rpc, contract, [extra args...]; prints the deployed address
     | awk '/Deployed to:/ {print $3}'
 }
 check() { [ "$1" = "$2" ] || { echo "address mismatch: got $1, expected $2" >&2; exit 1; }; }
+send() { cast send "$@" --rpc-url "$BASE_SEPOLIA_RPC" --private-key "$PRIVATE_KEY" > /dev/null; }
 
+if [ -n "$LEAD_RPC" ]; then
+  check "$(create "$LEAD_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$LEAD_AGG"
+  cast send "$LEAD_AGG" "updateAnswer(int256)" 200000000000 --rpc-url "$LEAD_RPC" --private-key "$PRIVATE_KEY" > /dev/null
+  echo "Lead WETH/USD feed on chain $LEAD_CHAIN_ID: $LEAD_AGG"
+fi
+
+RC_CONFIG="($BASE_CHAIN_ID,$SHIELD,[$WETH,$WBTC],[18,8],[$AGG_WETH,$AGG_WBTC],[$PROXY_WETH,$PROXY_WBTC],[$WETH_BUCKET,$WBTC_BUCKET],$CRON_TOPIC,$LEAD_ID,$LEAD_AGG,0)"
 check "$(create "$REACTIVE_LASNA_RPC" src/ShieldReactive.sol:ShieldReactive --value "$REACTIVE_FUNDING" \
-  --constructor-args $BASE_CHAIN_ID "$ORACLE" "$SHIELD" "$WETH")" "$REACTIVE"
+  --constructor-args "$RC_CONFIG")" "$REACTIVE"
 echo "ShieldReactive on Lasna: $REACTIVE"
 
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockWETH)" "$WETH"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockERC20 --constructor-args "Test USD Coin" tUSDC 6)" "$USDC"
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockERC20 --constructor-args "Test Wrapped BTC" tWBTC 8)" "$WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAaveOracle.sol:MockAaveOracle)" "$ORACLE"
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$AGG_WETH"
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$AGG_WBTC"
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregatorProxy --constructor-args "$AGG_WETH")" "$PROXY_WETH"
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregatorProxy --constructor-args "$AGG_WBTC")" "$PROXY_WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAavePool.sol:MockAavePool --constructor-args "$WETH" "$USDC" "$ORACLE")" "$POOL"
+SHIELD_CONFIG="($POOL,$ORACLE,$WETH,$USDC,[$WETH,$WBTC],[$AWETH,$AWBTC],$FEE_BPS,$MIN_FEE_WEI,$WATCH_FEE_WEI_PER_DAY)"
 check "$(create "$BASE_SEPOLIA_RPC" src/LiquidationShield.sol:LiquidationShield --value "$SHIELD_SEED" \
-  --constructor-args "$CALLBACK_PROXY_BASE_SEPOLIA" "$REACTIVE" "$POOL" "$ORACLE" "$WETH" $FEE_BPS $MIN_FEE_WEI)" "$SHIELD"
+  --constructor-args "$CALLBACK_PROXY_BASE_SEPOLIA" "$REACTIVE" "$SHIELD_CONFIG")" "$SHIELD"
 echo "Base Sepolia contracts deployed."
 
-cast send "$ORACLE" "setAssetPrice(address,uint256)" "$WETH" 200000000000 \
-  --rpc-url "$BASE_SEPOLIA_RPC" --private-key "$PRIVATE_KEY" > /dev/null
-echo "WETH price set to \$2000."
+send "$ORACLE" "setAssetSource(address,address)" "$WETH" "$PROXY_WETH"
+send "$ORACLE" "setAssetSource(address,address)" "$WBTC" "$PROXY_WBTC"
+send "$POOL" "listCollateral(address,uint16,uint16,uint16,uint8)" "$WBTC" 7300 7800 10500 8
+check "$(cast call "$POOL" "aTokenOf(address)(address)" "$WBTC" --rpc-url "$BASE_SEPOLIA_RPC")" "$AWBTC"
+send "$ORACLE" "setAssetPrice(address,uint256)" "$WETH" 200000000000
+send "$ORACLE" "setAssetPrice(address,uint256)" "$WBTC" 6000000000000
+echo "Prices set: WETH \$2,000, WBTC \$60,000."
+
+DEMO=$(create "$BASE_SEPOLIA_RPC" src/DemoLoan.sol:DemoLoan --value "$((4000000000000000 + DEMO_RESERVE))" \
+  --constructor-args "$WETH" "$USDC" "$ORACLE" "$POOL" "$SHIELD" "$DEMO_RESERVE")
+echo "DemoLoan: $DEMO"
 
 cat > deployments.env <<EOF
 DEPLOYER=$DEPLOYER
 WETH=$WETH
 USDC=$USDC
+WBTC=$WBTC
 ORACLE=$ORACLE
+AGG_WETH=$AGG_WETH
+AGG_WBTC=$AGG_WBTC
+PROXY_WETH=$PROXY_WETH
+PROXY_WBTC=$PROXY_WBTC
 POOL=$POOL
 SHIELD=$SHIELD
 REACTIVE=$REACTIVE
+DEMO=$DEMO
+LEAD_CHAIN_ID=$LEAD_ID
+LEAD_AGG=$LEAD_AGG
 EOF
 echo "Saved deployments.env"

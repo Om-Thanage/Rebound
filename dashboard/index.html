@@ -128,6 +128,10 @@
   .steps li[data-state="fail"] .steps__n { background: #c2410c; color: #fff; border-color: #c2410c; }
   @media (max-width: 1023px) { .steps { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); } .steps li { padding-top: var(--s-2); } }
   .run-status a { font-family: var(--font-mono); }
+  .mode-pick { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
+  .mode-pick button[aria-pressed="true"] { background: var(--p-ink); color: #fff; }
+  .pos__warn { font-size: 13px; color: #c2410c; }
+  .ledger__sub { border-top: 1px solid var(--u-line); padding-top: 12px; display: grid; gap: 8px; }
   .fee-compare { margin-top: var(--s-8); }
   .bars { padding: 24px; display: grid; gap: 16px; align-content: start; height: 100%; font-family: var(--font-text); }
   .bars__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -213,14 +217,14 @@
     <div class="wrap">
       <div class="grid">
         <h2 id="live-h" class="span-5">A demo loan you can crash</h2>
-        <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
+        <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><div class="mode-pick" role="group" aria-label="How the shield rescues the demo loan" data-mode-pick hidden><span class="pos__note">Rescue by</span><button type="button" class="btn btn--secondary btn--sm" data-mode="0" aria-pressed="true">Adding collateral</button><button type="button" class="btn btn--secondary btn--sm" data-mode="1" aria-pressed="false">Repaying debt</button></div><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
       </div>
       <ol class="steps" data-steps aria-label="What one run does">
         <li data-step="1" data-state="wait"><span class="steps__n">1</span><span class="steps__t">Connect your wallet</span><span class="steps__d" data-step-detail>On Base Sepolia, the test network</span></li>
-        <li data-step="2" data-state="wait"><span class="steps__n">2</span><span class="steps__t">Confirm one transaction</span><span class="steps__d" data-step-detail>Resets the loan at $2,000, then drops WETH to $1,800</span></li>
-        <li data-step="3" data-state="wait"><span class="steps__n">3</span><span class="steps__t">Loan falls under its trigger</span><span class="steps__d" data-step-detail>Health factor 1.20 to 1.08 on Base; trigger is 1.15</span></li>
-        <li data-step="4" data-state="wait"><span class="steps__n">4</span><span class="steps__t">Reactive Network reacts</span><span class="steps__d" data-step-detail>ShieldReactive on Lasna sees the price and asks for a rescue</span></li>
-        <li data-step="5" data-state="wait"><span class="steps__n">5</span><span class="steps__t">Shield rescues the loan</span><span class="steps__d" data-step-detail>Adds collateral on Base until the health factor is 1.40</span></li>
+        <li data-step="2" data-state="wait"><span class="steps__n">2</span><span class="steps__t">Confirm one transaction</span><span class="steps__d" data-step-detail>Resets the loan at $2,000, then drops WETH to $1,950 and $1,800</span></li>
+        <li data-step="3" data-state="wait"><span class="steps__n">3</span><span class="steps__t">Price falls fast</span><span class="steps__d" data-step-detail>Health factor 1.20, 1.17, then 1.08 on Base; trigger is 1.15</span></li>
+        <li data-step="4" data-state="wait"><span class="steps__n">4</span><span class="steps__t">Reactive Network reacts</span><span class="steps__d" data-step-detail>ShieldReactive on Lasna sees the fall at $1,950 and asks for a rescue before the trigger is crossed</span></li>
+        <li data-step="5" data-state="wait"><span class="steps__n">5</span><span class="steps__t">Shield rescues the loan</span><span class="steps__d" data-step-detail>Adds collateral or repays debt on Base until the health factor is 1.40</span></li>
       </ol>
       <div class="ui app fill" role="img" aria-label="Rescue history beside the protected loan's health factor, collateral, debt, reserve and WETH price" data-ui-pause-host>
         <div class="app__pane app__pane--list">
@@ -258,10 +262,13 @@
               <div class="pos__cell"><span>Collateral</span><strong data-live="coll">0.0052 WETH</strong></div>
               <div class="pos__cell"><span>Debt</span><strong data-live="debt">5.50 USDC</strong></div>
               <div class="pos__cell"><span>Shield reserve</span><strong data-live="reserve">0.0011 WETH</strong></div>
+              <div class="pos__cell"><span>Repay reserve</span><strong data-live="repay-reserve">–</strong></div>
+              <div class="pos__cell"><span>Mode</span><strong data-live="mode">Collateral</strong></div>
               <div class="pos__cell"><span>Trigger</span><strong>1.15</strong></div>
               <div class="pos__cell"><span>Target</span><strong>1.40</strong></div>
             </div>
-            <p class="pos__note">Below 1.0 the pool lets anyone liquidate the loan. The shield acts at 1.15.</p>
+            <p class="pos__note">Below 1.0 the pool lets anyone liquidate the loan. The shield acts at 1.15, or earlier when the price is falling fast.</p>
+            <p class="pos__note" data-live="cover"></p>
           </div>
         </div>
       </div>
@@ -272,11 +279,11 @@
     <div class="wrap">
       <div data-moment="liquid-type" class="section-head" style="max-width:none">
         <h2 id="fee-h" class="mo-lt__type">Pay 0.3% instead of 5%</h2>
-        <p>Aave gives liquidators a 5% bonus on WETH collateral. Parapet keeps 0.3% of the collateral it adds, with a floor of 0.0001 ETH.</p>
+        <p>Aave gives liquidators a 5% bonus on WETH collateral. Parapet keeps 0.3% of the value it moves, with a floor of 0.0001 ETH, gas included.</p>
       </div>
       <div class="grid fee-compare">
         <div class="span-6 stack-2"><p class="t-stat">5% of the seized collateral</p><p class="muted">Paid to a liquidator when the health factor falls under 1.0</p></div>
-        <div class="span-6 start-7 stack-2"><p class="t-stat">0.3% of the top-up</p><p class="muted">Paid to Parapet when the health factor falls under 1.15</p></div>
+        <div class="span-6 start-7 stack-2"><p class="t-stat">0.3% of the rescue</p><p class="muted">Paid to Parapet when the health factor falls under 1.15. Repaying debt instead of adding collateral needs 1.7 times less money</p></div>
       </div>
     </div>
   </section>
@@ -286,8 +293,9 @@
       <div class="section-head"><h2 id="how-h">Parapet's rescue loop, from price event to callback</h2></div>
       <div class="grid">
         <div class="span-6 stack-4">
-          <p>The oracle on Base Sepolia emits a price update. ShieldReactive on Reactive Lasna re-prices every mirrored loan and requests a callback for each one under its trigger.</p>
-          <p>The shield on Base checks the live loan again, supplies the smallest top-up that restores the target, and turns its fee into the ETH that pays the callback.</p>
+          <p>A Chainlink-style feed on Base Sepolia emits <code>AnswerUpdated</code>. ShieldReactive on Reactive Lasna re-prices only the loans whose trigger price is near the new price, and requests a callback for each one under its trigger, or about to be if the price keeps falling at the same speed.</p>
+          <p>The shield on Base checks the live loan again, repays debt or supplies collateral by the smallest amount that restores the target, and turns its fee into the ETH that pays the callback.</p>
+          <p>The same contract also listens to the feed on Ethereum Sepolia, which can move first, follows the feed if Chainlink swaps its aggregator, and wakes on Reactive's CRON to catch anything a tick missed.</p>
         </div>
         <div class="span-6 start-7">
           <div class="panel"><div class="dg" data-diagram><script type="application/json">{"layout":"lanes","alt":"A WETH price update on Base Sepolia reaches ShieldReactive on Reactive Lasna, which re-prices three loans and rescues the one under its trigger.","curve":"curve","input":{"label":"Oracle","icon":"ui:box","meta":"Base"},"core":{"label":"Reactive","icon":"ui:server","meta":"Lasna"},"lanes":[{"label":"Loan A","icon":"ui:server","meta":"1.32 ok","done":true},{"label":"Loan B","icon":"ui:server","meta":"1.08 rescue","done":true},{"label":"Loan C","icon":"ui:server","meta":"1.51 ok","done":true}]}</script></div></div>
@@ -323,7 +331,7 @@
       <div class="grid">
         <div class="span-6 stack-4">
           <h2 id="fees-h">Parapet's fees pay its callback gas</h2>
-          <p>Every fee is unwrapped to ETH inside the shield, and the callback proxy takes its gas from that balance. Execution on Lasna, about 0.04 lREACT a rescue, is still funded by hand.</p>
+          <p>Every fee is unwrapped to ETH inside the shield, and the callback proxy takes its gas from that balance. A small daily watch fee covers loans that are watched but never rescued. Execution on Lasna is paid in lREACT, funded by hand on testnet; the panel shows how much work it does.</p>
           <p>Everything runs on Base Sepolia and Reactive Lasna testnets with test tokens. The pool copies Aave V3's function names and health factor maths so the demo can move the price.</p>
           <a class="link" href="https://base-sepolia.blockscout.com/address/0x3796897b27240f329b32184f2C2cBd6666A1EeaE">Open the shield on Blockscout</a>
         </div>
@@ -335,6 +343,16 @@
             <div class="ledger__row"><span>Callback gas paid</span><strong data-live="gas">0.000003 ETH</strong><div class="ledger__bar"><i class="gas" data-live="gasbar" style="width:2%"></i></div></div>
             <div class="ledger__row"><span>Seed sent at deploy</span><strong data-live="seed">0.002000 ETH</strong></div>
             <div class="ledger__row"><span>Owed to the proxy</span><strong data-live="owed">0 ETH</strong></div>
+            <div class="ledger__row"><span>Of which watch fees</span><strong data-live="watch">–</strong></div>
+            <div class="ledger__row"><span>Callbacks with nothing to do</span><strong data-live="skipped">–</strong></div>
+            <div class="ledger__sub">
+              <span class="pos__note">Reactive side, ShieldReactive on Lasna</span>
+              <div class="ledger__row"><span>Price events handled</span><strong data-live="ticks">–</strong></div>
+              <div class="ledger__row"><span>Loans checked</span><strong data-live="checked">–</strong></div>
+              <div class="ledger__row"><span>Rescues requested (early)</span><strong data-live="requested">–</strong></div>
+              <div class="ledger__row"><span>CRON sweeps</span><strong data-live="cron">–</strong></div>
+              <div class="ledger__row"><span>lREACT balance</span><strong data-live="lreact">–</strong></div>
+            </div>
           </div></div>
         </div>
       </div>
