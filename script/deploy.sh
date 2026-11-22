@@ -41,7 +41,8 @@ REACTIVE=$(addr "$DEPLOYER" $((lasna_nonce)))
 LEAD_AGG=0x0000000000000000000000000000000000000000
 LEAD_ID=0
 if [ -n "$LEAD_RPC" ]; then
-  LEAD_AGG=$(addr "$DEPLOYER" "$(cast nonce "$DEPLOYER" --rpc-url "$LEAD_RPC")")
+  # LEAD_AGG_DEPLOYED reuses a lead feed from an earlier, interrupted run (Sepolia receipts can be slow)
+  LEAD_AGG=${LEAD_AGG_DEPLOYED:-$(addr "$DEPLOYER" "$(cast nonce "$DEPLOYER" --rpc-url "$LEAD_RPC")")}
   LEAD_ID=$LEAD_CHAIN_ID
 fi
 CRON_TOPIC=$(cast keccak "${CRON_EVENT}(uint256)")
@@ -56,7 +57,7 @@ check() { [ "$1" = "$2" ] || { echo "address mismatch: got $1, expected $2" >&2;
 send() { cast send "$@" --rpc-url "$BASE_SEPOLIA_RPC" --private-key "$PRIVATE_KEY" > /dev/null; }
 
 if [ -n "$LEAD_RPC" ]; then
-  check "$(create "$LEAD_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$LEAD_AGG"
+  [ -n "${LEAD_AGG_DEPLOYED:-}" ] || check "$(create "$LEAD_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$LEAD_AGG"
   cast send "$LEAD_AGG" "updateAnswer(int256)" 200000000000 --rpc-url "$LEAD_RPC" --private-key "$PRIVATE_KEY" > /dev/null
   echo "Lead WETH/USD feed on chain $LEAD_CHAIN_ID: $LEAD_AGG"
 fi
