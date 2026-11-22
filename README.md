@@ -257,10 +257,11 @@ bash script/demo.sh 1800          # opens and protects a loan, crashes WETH, tim
 bash script/lead.sh 1900          # moves the lead feed first: the rescue lands before Base's oracle moves
 bash script/bench.sh 20           # 20 timed rounds -> results/bench.csv (START=n continues a run)
 node script/export-bench.mjs      # feeds the dashboard's speed section
+node script/export-rescues.mjs    # snapshots every rescue for the dashboard's list (it adds newer ones live)
 ```
 
 Open the dashboard over any static server (for example `npx serve dashboard`). It reads the contracts over
-Base Sepolia's and Lasna's public RPCs and the `Rescued` events from Blockscout, and refreshes every 10 seconds.
+Base Sepolia's and Lasna's public RPCs and the `Rescued` events from `data/rescues.json` plus a public RPC for anything newer, and refreshes every 10 seconds.
 
 ## Submission checklist
 

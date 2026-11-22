@@ -4,6 +4,7 @@ let RPC = 'https://sepolia.base.org';
 const SCOUT = 'https://base-sepolia.blockscout.com';
 let LASNA = 'https://lasna-rpc.rnk.dev/';
 const LASNA_SCAN = 'https://lasna.reactscan.net';
+const LOGS_RPC = 'https://base-sepolia-rpc.publicnode.com'; // wide eth_getLogs ranges, open CORS
 let REACTIVE = '0x49074f7961c01416cf5A57d13df664C32fb33345';
 // Addresses of the live deployment; data/deployment.json (written by script/export-deployment.mjs) overrides them.
 const A = {
@@ -135,14 +136,19 @@ async function readReactive() {
 }
 
 async function readRescues() {
-  // Blockscout's filtered log API returns every Rescued event (up to 1,000), not one page of mixed events
-  const logsOf = async (topic) => {
-    const r = await fetch(`${SCOUT}/api?module=logs&action=getLogs&address=${A.shield}&topic0=${topic}&fromBlock=0&toBlock=latest`);
-    const j = await r.json();
-    return Array.isArray(j.result) ? j.result : [];
-  };
-  const [rescueLogs, detailLogs] = await Promise.all([logsOf(RESCUED), logsOf(DETAIL)]);
-  const rescues = rescueLogs.map((l) => ({ ...l, transaction_hash: l.transactionHash })).reverse(); // newest first
+  // history ships with the site (data/rescues.json, script/export-rescues.mjs); newer rescues come straight from an
+  // RPC that accepts wide eth_getLogs ranges. No Blockscout here: its free API rate-limits visitors (HTTP 429).
+  const hist = await fetch('data/rescues.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const own = hist && hist.shield?.toLowerCase() === A.shield.toLowerCase() ? hist : { toBlock: 0, rescued: [], detail: [] };
+  const head = Number(await rpcAt(LOGS_RPC, 'eth_blockNumber', []));
+  const from = Math.max(own.toBlock + 1, head - 19999); // shortcut: a gap older than ~1 hour waits for the next export
+  const tail = (topic) => rpcAt(LOGS_RPC, 'eth_getLogs', [{ address: A.shield, topics: [topic], fromBlock: '0x' + from.toString(16), toBlock: 'latest' }]).catch(() => []);
+  const [newRescued, newDetail] = await Promise.all([tail(RESCUED), tail(DETAIL)]);
+  const seen = new Set();
+  const rescueLogs = [...own.rescued, ...newRescued].filter((l) => !seen.has(l.transactionHash + l.topics[1]) && seen.add(l.transactionHash + l.topics[1]));
+  const detailLogs = [...own.detail, ...newDetail];
+  const rescues = rescueLogs.map((l) => ({ ...l, transaction_hash: l.transactionHash }))
+    .sort((x, y) => Number(y.blockNumber) - Number(x.blockNumber)); // newest first
   // a repay-mode rescue supplies no WETH; its RescueDetail (same transaction) carries the debt it repaid
   const repaidIn = Object.fromEntries(detailLogs.map((l) => [l.transactionHash, words(l.data)[0]]));
   const [count] = await call(A.shield, SEL.count);
