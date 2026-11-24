@@ -266,10 +266,12 @@
                 <button type="button" class="ui-win__nav is-on" data-filter="all" aria-pressed="true">All rescues<em data-live="count">…</em></button>
                 <button type="button" class="ui-win__nav" data-filter="demo" aria-pressed="false"><span class="ui-win__hash">D</span>Demo loan<em data-live="count-demo">…</em></button>
                 <button type="button" class="ui-win__nav" data-filter="bench" aria-pressed="false"><span class="ui-win__hash">B</span>Benchmark<em data-live="count-bench">…</em></button>
+                <button type="button" class="ui-win__nav" data-filter="other" aria-pressed="false"><span class="ui-win__hash">L</span>Other loans<em data-live="count-other">…</em></button>
                 <span class="ui-win__label">Contracts</span>
                 <a class="ui-win__nav" data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc" target="_blank" rel="noopener">Shield, Base ↗</a>
                 <a class="ui-win__nav" data-live-href="reactive" href="https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345" target="_blank" rel="noopener">Reactive, Lasna ↗</a>
                 <span class="ui-win__label">Loans watched: <b data-live="loans">2</b></span>
+                <span class="ui-win__label" data-live="coverage"></span>
               </nav>
               <div class="ui-win__main">
                 <div class="ui-win__cols" aria-hidden="true"><span>Loan</span><span>What the rescue did</span><span>Transaction</span><span>When</span></div>
@@ -377,7 +379,7 @@
               <div class="ledger__row"><span>Loans checked</span><strong data-live="checked">–</strong></div>
               <div class="ledger__row"><span>Rescues requested (early)</span><strong data-live="requested">–</strong></div>
               <div class="ledger__row"><span>CRON sweeps</span><strong data-live="cron">–</strong></div>
-              <div class="ledger__row"><span>lREACT balance</span><strong data-live="lreact">–</strong></div>
+              <div class="ledger__row"><span>lREACT left (reserve + contract)</span><strong data-live="lreact">–</strong></div>
             </div>
           </div></div>
         </div>

@@ -1,5 +1,6 @@
-// Live data for the dashboard: reads the shield, the pool and the oracle on Base Sepolia over JSON-RPC,
-// the shield's Rescued events from Blockscout, and the benchmark from data/bench.json.
+// Live data for the dashboard: reads the shield, the pool and the oracle on Base Sepolia over JSON-RPC, the reactive
+// contract on Lasna, the shield's Rescued events (shipped history + Blockscout + RPC, see readRescues), and the
+// benchmark from data/bench.json.
 let RPC = 'https://sepolia.base.org';
 const SCOUT = 'https://base-sepolia.blockscout.com';
 let LASNA = 'https://lasna-rpc.rnk.dev/';
@@ -13,10 +14,14 @@ const A = {
   oracle: '0xB567239e6AE5E9b76462dAE4610335e480263b03',
   pool: '0x7ac6FcF13E42908F78A691B7CaF7Cb55BfD18774',
   shield: '0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc',
+  deployer: '0x312D0201519E71A0A7704F7a349d35B129615fcD', // the benchmark loan (script/bench.sh)
 };
+const SYSTEM = '0x8888888888888888888888888888888888888888'; // Reactive system contract on Lasna
+const LREACT_PER_RUN = 0.111; // measured cost of one dashboard run on Lasna (README)
 const SEL = { account: '0xbf92857c', price: '0xb3596f07', prot: '0x613e3fc0', ledger: '0x30b7c49f', collateral: '0xa5fdc5de', debt: '0x9b6c56ec', count: '0x98e78023', run: '0xc0406226', wait: '0xccca123b',
   breakdown: '0x46332ee4', mode: '0x295a5212', runWithMode: '0x6a99d796',
-  ticks: '0x36ff1f66', checked: '0x82b26947', requested: '0xb8c1e462', early: '0x3a9b9e03', cron: '0x0ba10b24', users: '0x07973ccf' };
+  ticks: '0x36ff1f66', checked: '0x82b26947', requested: '0xb8c1e462', early: '0x3a9b9e03', cron: '0x0ba10b24', users: '0x07973ccf',
+  reserves: '0xd66bd524', debts: '0x2ecd4e7d' };
 const RESCUED = '0x28b6c2526f0d05eac057487199a229c2584389d09c1a5b014dcf02610fdd8419';
 const DETAIL = '0xd6a7d2fcb36c3966223a7015df24966d5b6b9a16ae2770e4708df14e86565b3f'; // RescueDetail: repaid debt, hint
 const MODES = ['Collateral', 'Repay', 'Combined'];
@@ -124,63 +129,139 @@ async function readReactive() {
   const lasna = (sel) => call(REACTIVE, sel, LASNA).then((w) => w[0]);
   const [ticks, checked, requested, early, cron, users] = await Promise.all(
     [SEL.ticks, SEL.checked, SEL.requested, SEL.early, SEL.cron, SEL.users].map(lasna));
-  // Reactive charges execution against the system contract's reserve for this contract, not its own balance
-  const [bal] = await call('0x8888888888888888888888888888888888888888', '0xd66bd524' + arg(REACTIVE), LASNA);
+  // Reactive charges the system contract's reserve for this contract first; when that is empty it calls the
+  // contract's pay(), which spends the contract's own balance. Runway = reserve + own balance - debt.
+  const sys = (sel) => call(SYSTEM, sel + arg(REACTIVE), LASNA).then((w) => w[0]);
+  const [reserve, debt, own] = await Promise.all([sys(SEL.reserves), sys(SEL.debts),
+    rpcAt(LASNA, 'eth_getBalance', [REACTIVE, 'latest']).then(BigInt)]);
   set('ticks', String(ticks));
   const watched = `${users} ${users === 1n ? 'loan' : 'loans'} watched`;
   set('checked', ticks > 0n ? `${(Number(checked) / Number(ticks)).toFixed(1)} per event, ${watched}` : watched);
   set('requested', `${requested} (${early} early)`);
   set('cron', String(cron));
   set('loans', String(users));
-  set('lreact', eth(bal, 3) + ' lREACT');
+  const left = reserve + own - debt;
+  set('lreact', debt > 0n
+    ? `in debt by ${eth(debt, 3)}: paused until topped up`
+    : `${eth(left, 3)} lREACT, about ${Math.floor(Number(left) / 1e18 / LREACT_PER_RUN)} demo runs`);
+}
+
+// ---- Rescue list: three layers, each doing what it is good at.
+// 1. data/rescues.json: the history, shipped with the site (script/export-rescues.mjs), instant on load.
+// 2. Blockscout, once per page load: one call fills the gap between that file and now, whatever its size.
+// 3. RPC every 10 s: only the blocks since the last read; cheap, not rate-limited, no indexing lag.
+// If Blockscout fails (rate limit, outage), the gap is read over RPC in chunks, capped at a day, and the page says
+// which blocks it could not load instead of dropping rescues silently.
+const RL = { ready: false, lastBlock: 0, rescued: new Map(), repaid: new Map(), missing: null };
+const DAY_BLOCKS = 432_000; // Base: 200 ms blocks
+const CHUNK = 20_000; // the public RPC's eth_getLogs range limit
+
+function addLogs(rescued, detail) {
+  for (const l of rescued) RL.rescued.set(l.transactionHash + l.topics[1], l);
+  // RescueDetail rides in the same transaction as its Rescued event and carries the debt it repaid
+  for (const l of detail) RL.repaid.set(l.transactionHash, words(l.data)[0]);
+}
+
+async function logsRpc(topic, from, to) {
+  const out = [];
+  for (let f = from; f <= to; f += CHUNK) {
+    const t = Math.min(to, f + CHUNK - 1);
+    out.push(...await rpcAt(LOGS_RPC, 'eth_getLogs', [{ address: A.shield, topics: [topic], fromBlock: hex(f), toBlock: hex(t) }]));
+  }
+  return out;
+}
+
+async function logsScout(topic, from, to) {
+  const out = [];
+  for (let page = 1; page <= 10; page++) {
+    const url = `${SCOUT}/api?module=logs&action=getLogs&address=${A.shield}&topic0=${topic}&fromBlock=${from}&toBlock=${to}&page=${page}&offset=1000`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Blockscout HTTP ${r.status}`);
+    const j = await r.json();
+    if (j.status !== '1') {
+      if (/no (records|logs) found/i.test(j.message || '')) break;
+      throw new Error(`Blockscout: ${j.message || 'error'}`);
+    }
+    out.push(...j.result.map((l) => ({ transactionHash: l.transactionHash, blockNumber: l.blockNumber, topics: l.topics.filter(Boolean), data: l.data })));
+    if (j.result.length < 1000) break;
+  }
+  return out;
+}
+
+async function loadRescueHistory() {
+  const hist = await fetch('data/rescues.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const own = hist && hist.shield?.toLowerCase() === A.shield.toLowerCase();
+  if (own) addLogs(hist.rescued, hist.detail);
+  const head = Number(await rpcAt(LOGS_RPC, 'eth_blockNumber', []));
+  const from = own ? hist.toBlock + 1 : Math.max(0, head - DAY_BLOCKS);
+  if (from <= head) {
+    try {
+      const [r, d] = await Promise.all([logsScout(RESCUED, from, head), logsScout(DETAIL, from, head)]);
+      addLogs(r, d);
+    } catch (e) {
+      console.warn('live data: Blockscout gap fill failed, using RPC:', e.message);
+      const rpcFrom = Math.max(from, head - DAY_BLOCKS);
+      const [r, d] = await Promise.all([logsRpc(RESCUED, rpcFrom, head), logsRpc(DETAIL, rpcFrom, head)]);
+      addLogs(r, d);
+      if (rpcFrom > from) RL.missing = [from, rpcFrom - 1];
+    }
+  }
+  if (!own && head > DAY_BLOCKS) RL.missing = RL.missing || [0, head - DAY_BLOCKS - 1];
+  RL.lastBlock = head;
+  RL.ready = true;
 }
 
 async function readRescues() {
   document.querySelectorAll('[data-live-href="shield"]').forEach((a) => { a.href = `${SCOUT}/address/${A.shield}`; });
   document.querySelectorAll('[data-live-href="reactive"]').forEach((a) => { a.href = `${LASNA_SCAN}/address/${REACTIVE}`; });
-  // history ships with the site (data/rescues.json, script/export-rescues.mjs); newer rescues come straight from an
-  // RPC that accepts wide eth_getLogs ranges. No Blockscout here: its free API rate-limits visitors (HTTP 429).
-  const hist = await fetch('data/rescues.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const own = hist && hist.shield?.toLowerCase() === A.shield.toLowerCase() ? hist : { toBlock: 0, rescued: [], detail: [] };
-  const head = Number(await rpcAt(LOGS_RPC, 'eth_blockNumber', []));
-  const from = Math.max(own.toBlock + 1, head - 19999); // shortcut: a gap older than ~1 hour waits for the next export
-  const tail = (topic) => rpcAt(LOGS_RPC, 'eth_getLogs', [{ address: A.shield, topics: [topic], fromBlock: '0x' + from.toString(16), toBlock: 'latest' }]).catch(() => []);
-  const [newRescued, newDetail] = await Promise.all([tail(RESCUED), tail(DETAIL)]);
-  const seen = new Set();
-  const rescueLogs = [...own.rescued, ...newRescued].filter((l) => !seen.has(l.transactionHash + l.topics[1]) && seen.add(l.transactionHash + l.topics[1]));
-  const detailLogs = [...own.detail, ...newDetail];
-  const rescues = rescueLogs.map((l) => ({ ...l, transaction_hash: l.transactionHash }))
-    .sort((x, y) => Number(y.blockNumber) - Number(x.blockNumber)); // newest first
-  // a repay-mode rescue supplies no WETH; its RescueDetail (same transaction) carries the debt it repaid
-  const repaidIn = Object.fromEntries(detailLogs.map((l) => [l.transactionHash, words(l.data)[0]]));
+  if (!RL.ready) await loadRescueHistory();
+  else {
+    const head = Number(await rpcAt(LOGS_RPC, 'eth_blockNumber', []));
+    if (head > RL.lastBlock) {
+      const [r, d] = await Promise.all([logsRpc(RESCUED, RL.lastBlock + 1, head), logsRpc(DETAIL, RL.lastBlock + 1, head)]);
+      addLogs(r, d);
+      RL.lastBlock = head;
+    }
+  }
   const [count] = await call(A.shield, SEL.count);
   set('count', String(count));
+  const rescues = [...RL.rescued.values()].sort((x, y) => Number(y.blockNumber) - Number(x.blockNumber)); // newest first
+  set('coverage', RL.missing
+    ? `Blocks ${RL.missing[0]} to ${RL.missing[1]} not loaded: ${rescues.length} of ${count} rescues listed`
+    : (BigInt(rescues.length) < count ? `${rescues.length} of ${count} rescues listed` : ''));
   const list = $('rows')[0];
   if (!list || !rescues.length) return;
-  const demo = A.user.toLowerCase();
+  const kind = (user) => (user === A.user.toLowerCase() ? 'demo' : user === A.deployer.toLowerCase() ? 'bench' : 'other');
+  const LABEL = { demo: ['D', 'Demo loan', 2], bench: ['B', 'Benchmark loan', 1], other: ['L', 'Other loan', 3] };
   list.replaceChildren(...rescues.slice(0, 100).map((l) => {
     const [supplied, , before, after, ts] = words(l.data);
-    const user = '0x' + l.topics[1].slice(26);
-    const isDemo = user === demo;
-    const repaid = repaidIn[l.transaction_hash] || 0n;
-    const did = supplied > 0n ? `added ${eth(supplied, 5)} WETH` : `repaid ${(Number(repaid) / 1e6).toFixed(2)} USDC`;
+    const k = kind('0x' + l.topics[1].slice(26));
+    const repaid = RL.repaid.get(l.transactionHash) || 0n;
+    // a combined-mode rescue does both: say both
+    const parts = [repaid > 0n ? `repaid ${(Number(repaid) / 1e6).toFixed(2)} USDC` : '', supplied > 0n ? `added ${eth(supplied, 5)} WETH` : '']
+      .filter(Boolean);
+    const did = parts.length ? parts.join(' and ') : 'rescued';
     const mins = Math.max(0, Math.round((Date.now() / 1000 - Number(ts)) / 60));
     const li = document.createElement('li');
     li.className = 'ui-win__row';
-    li.dataset.loan = isDemo ? 'demo' : 'bench';
-    li.innerHTML = `<span class="ui-avatar" data-tone="${isDemo ? 2 : 1}">${isDemo ? 'D' : 'B'}</span><span class="ui-win__who"><span></span><a target="_blank" rel="noopener"></a></span><span class="ui-win__sub"></span><span class="ui-win__age"></span>`;
-    li.children[1].firstChild.textContent = isDemo ? 'Demo loan' : 'Benchmark loan';
+    li.dataset.loan = k;
+    const [avatar, label, tone] = LABEL[k];
+    li.innerHTML = `<span class="ui-avatar" data-tone="${tone}"></span><span class="ui-win__who"><span></span><a target="_blank" rel="noopener"></a></span><span class="ui-win__sub"></span><span class="ui-win__age"></span>`;
+    li.children[0].textContent = avatar;
+    li.children[1].firstChild.textContent = label;
     li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)} · HF ${hf(before)} → ${hf(after)}`;
     const a = li.children[1].lastChild;
-    a.href = `${SCOUT}/tx/${l.transaction_hash}`;
-    a.title = l.transaction_hash;
-    a.textContent = `${l.transaction_hash.slice(0, 10)}…`;
-    li.children[3].textContent = mins < 60 ? `${mins}m` : `${Math.round(mins / 60)}h`;
+    a.href = `${SCOUT}/tx/${l.transactionHash}`;
+    a.title = l.transactionHash;
+    a.textContent = `${l.transactionHash.slice(0, 10)}…`;
+    li.children[3].textContent = mins < 60 ? `${mins}m` : mins < 2880 ? `${Math.round(mins / 60)}h` : `${Math.round(mins / 1440)}d`;
     return li;
   }));
-  const demoCount = rescues.filter((l) => '0x' + l.topics[1].slice(26) === demo).length;
-  set('count-demo', String(demoCount));
-  set('count-bench', String(rescues.length - demoCount));
+  const counts = { demo: 0, bench: 0, other: 0 };
+  for (const l of rescues) counts[kind('0x' + l.topics[1].slice(26))]++;
+  set('count-demo', String(counts.demo));
+  set('count-bench', String(counts.bench));
+  set('count-other', String(counts.other));
   applyFilter();
 }
 
