@@ -62,8 +62,7 @@ contract DemoLoan {
         pool_.supply(address(weth_), BASE_COLLATERAL, address(this), 0);
         pool_.borrow(address(usdc_), DEBT, 2, 0, address(this));
         usdc_.mint(address(this), REPAY_RESERVE); // the test USDC faucet is open
-        shield_.depositRepayReserve(REPAY_RESERVE);
-        shield_.protect(TRIGGER_HF, TARGET_HF, reserve);
+        shield_.setup(TRIGGER_HF, TARGET_HF, 0, LiquidationShield.Mode.Collateral, reserve, REPAY_RESERVE);
     }
 
     /// @notice Reset the loan, then crash the price in two steps, with collateral top-ups. Anyone, once a minute.
@@ -99,17 +98,13 @@ contract DemoLoan {
         uint256 extra = coll > BASE_COLLATERAL ? coll - BASE_COLLATERAL : 0;
         if (extra > 0) pool.withdraw(address(weth), extra, address(this));
         uint256 owed = pool.debt(address(this));
-        if (owed < DEBT) {
-            pool.borrow(address(usdc), DEBT - owed, 2, 0, address(this));
-            shield.depositRepayReserve(DEBT - owed);
-        }
-        if (mode_ != mode) {
-            mode = mode_;
-            shield.configure(TRIGGER_HF, TARGET_HF, 0, mode_);
-        }
-        // the last shield call re-publishes the position, which also clears a pending flag left by a lost callback
-        if (extra > 0) shield.protect(TRIGGER_HF, TARGET_HF, extra);
-        else shield.sync(address(this));
+        uint256 reborrowed = owed < DEBT ? DEBT - owed : 0;
+        if (reborrowed > 0) pool.borrow(address(usdc), reborrowed, 2, 0, address(this));
+        mode = mode_;
+        // one shield call, so one snapshot and one reactive transaction: returns what the last rescue used to the
+        // reserves, sets the mode, and re-publishes the position (which also clears a pending flag left by a lost
+        // callback)
+        shield.setup(TRIGGER_HF, TARGET_HF, 0, mode_, extra, reborrowed);
 
         oracle.setAssetPrice(address(weth), PRICE_STEP);
         oracle.setAssetPrice(address(weth), PRICE_CRASH);

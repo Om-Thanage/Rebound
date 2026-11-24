@@ -42,7 +42,8 @@ interface IWETH is IERC20Lite {
 contract LiquidationShield is AbstractCallback {
     enum Mode {
         Collateral, // add WETH collateral from the reserve
-        Repay, // repay debt from the debt-asset reserve (needs H/LT times less capital than a top-up)
+        Repay, // repay debt from the debt-asset reserve (needs H/LT times less capital than a top-up); once that
+        // reserve is empty, top up with WETH instead, so protection never lapses while WETH is left
         Combined // repay first, then top up with WETH for whatever is left
     }
 
@@ -112,6 +113,7 @@ contract LiquidationShield is AbstractCallback {
     event RescueDetail(address indexed user, uint256 repaidDebt, uint256 hintPrice, uint256 effectivePrice, uint256 goalHF);
     event RescueSkipped(address indexed user, uint256 hf, string reason);
     event WatchFeeCharged(address indexed user, uint256 amountWei);
+    event RepayReserveEmpty(address indexed user); // repay mode fell back to a WETH top-up
 
     error BadHealthFactors();
     error BadConfig();
@@ -153,6 +155,26 @@ contract LiquidationShield is AbstractCallback {
         if (amount > 0) {
             _pull(weth, msg.sender, amount);
             p.reserve = _u128(p.reserve + amount);
+        }
+        _snapshot(msg.sender);
+    }
+
+    /// @notice Everything in one call, so the reactive contract gets one snapshot (and spends one reactive
+    /// transaction) instead of one per change: health factors, step, mode, and WETH and debt-asset deposits.
+    function setup(uint64 triggerHF, uint64 targetHF, uint64 stepHF, Mode mode, uint256 wethAmount, uint256 debtAmount)
+        external
+    {
+        Protection storage p = protections[msg.sender];
+        _setHealthFactors(p, triggerHF, targetHF, stepHF);
+        _settleWatchFee(msg.sender, p);
+        p.mode = mode;
+        if (wethAmount > 0) {
+            _pull(weth, msg.sender, wethAmount);
+            p.reserve = _u128(p.reserve + wethAmount);
+        }
+        if (debtAmount > 0) {
+            _pull(debtAsset, msg.sender, debtAmount);
+            p.repayReserve = _u128(p.repayReserve + debtAmount);
         }
         _snapshot(msg.sender);
     }
@@ -239,7 +261,7 @@ contract LiquidationShield is AbstractCallback {
         if (c.hfEff >= p.triggerHF) return _skip(user, c.hf, "healthy");
         if (p.lastRescueAt != 0 && block.timestamp < p.lastRescueAt + COOLDOWN) return _skip(user, c.hf, "cooldown");
 
-        uint256 repaid = _plan(p, c);
+        uint256 repaid = _plan(user, p, c);
         p.lastRescueAt = _u64(block.timestamp);
         rescueCount++;
         if (c.fee == 0) feelessRescues++;
@@ -357,9 +379,12 @@ contract LiquidationShield is AbstractCallback {
     }
 
     /// Works out how much to repay (returned, in debt-asset units) and how much WETH to supply and charge (in `c`).
-    function _plan(Protection storage p, Ctx memory c) internal returns (uint256 repaid) {
+    function _plan(address user, Protection storage p, Ctx memory c) internal returns (uint256 repaid) {
         uint256 debtBase = c.debtBase;
         uint256 repaidBase;
+        // repay mode with an empty repay reserve tops up with WETH rather than leaving the loan unprotected
+        bool topUp = p.mode != Mode.Repay || p.repayReserve == 0;
+        if (p.mode == Mode.Repay && p.repayReserve == 0) emit RepayReserveEmpty(user);
         if (p.mode != Mode.Collateral && p.repayReserve > 0) {
             // HF = collLt / (D - x) / 1e4 >= goal  =>  x >= D - collLt * 1e18 / (goal * 1e4)
             uint256 keep = c.collLtEff * 1e18 / (c.goal * 10_000);
@@ -371,7 +396,7 @@ contract LiquidationShield is AbstractCallback {
             repaidBase = repaid * debtPrice / (10 ** debtDecimals);
             debtBase = debtBase > repaidBase ? debtBase - repaidBase : 0;
         }
-        if (p.mode != Mode.Repay && debtBase > 0) {
+        if (topUp && debtBase > 0) {
             // Smallest top-up that reaches the goal: collLt + x * LT >= goal * D * 1e4 / 1e18.
             // Round up, plus one, so the pool's own rounding can't leave HF a hair under the goal.
             uint256 needLt = _ceilDiv(c.goal * debtBase * 10_000, 1e18) + 1;
@@ -416,7 +441,7 @@ contract LiquidationShield is AbstractCallback {
 
     function _hasReserveFor(Protection storage p) internal view returns (bool) {
         if (p.mode == Mode.Collateral) return p.reserve > 0;
-        if (p.mode == Mode.Repay) return p.repayReserve > 0;
+        if (p.mode == Mode.Repay) return p.repayReserve > 0 || p.reserve > 0; // falls back to top-ups
         return p.reserve > 0 || p.repayReserve > 0;
     }
 

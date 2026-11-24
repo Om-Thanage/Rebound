@@ -57,7 +57,7 @@ check() { [ "$1" = "$2" ] || { echo "address mismatch: got $1, expected $2" >&2;
 send() { cast send "$@" --rpc-url "$BASE_SEPOLIA_RPC" --private-key "$PRIVATE_KEY" > /dev/null; }
 
 if [ -n "$LEAD_RPC" ]; then
-  [ -n "${LEAD_AGG_DEPLOYED:-}" ] || check "$(create "$LEAD_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$LEAD_AGG"
+  [ -n "${LEAD_AGG_DEPLOYED:-}" ] || check "$(create "$LEAD_RPC" src/mocks/MockAggregator.sol:MockAggregator --constructor-args 0x0000000000000000000000000000000000000000)" "$LEAD_AGG"
   cast send "$LEAD_AGG" "updateAnswer(int256)" 200000000000 --rpc-url "$LEAD_RPC" --private-key "$PRIVATE_KEY" > /dev/null
   echo "Lead WETH/USD feed on chain $LEAD_CHAIN_ID: $LEAD_AGG"
 fi
@@ -71,8 +71,9 @@ check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockWETH)" "$WETH"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockERC20 --constructor-args "Test USD Coin" tUSDC 6)" "$USDC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockERC20 --constructor-args "Test Wrapped BTC" tWBTC 8)" "$WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAaveOracle.sol:MockAaveOracle)" "$ORACLE"
-check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$AGG_WETH"
-check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator)" "$AGG_WBTC"
+# the oracle (predicted above) is the one updater allowed besides the deployer: its setAssetPrice is the demo's open door
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator --constructor-args "$ORACLE")" "$AGG_WETH"
+check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator --constructor-args "$ORACLE")" "$AGG_WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregatorProxy --constructor-args "$AGG_WETH")" "$PROXY_WETH"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregatorProxy --constructor-args "$AGG_WBTC")" "$PROXY_WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAavePool.sol:MockAavePool --constructor-args "$WETH" "$USDC" "$ORACLE")" "$POOL"

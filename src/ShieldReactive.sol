@@ -85,6 +85,9 @@ contract ShieldReactive is AbstractReactive {
     address[] public activeUsers;
     address[] public scanAlways; // positions that can't be bucketed by one price (several collateral assets)
     mapping(uint256 => mapping(uint256 => address[])) internal buckets; // asset => key => users
+    // asset => key / 256 => one bit per bucket that holds anyone: a tick reads one word for 256 buckets instead of
+    // one cold slot per bucket, which is most of what a price event that rescues nobody costs
+    mapping(uint256 => mapping(uint256 => uint256)) internal occupied;
     address[] public retryList; // under their trigger but inside the shield's cooldown
     uint256 public sweepCursor;
     mapping(uint256 => uint256) public resumeKey; // asset => bucket key + 1 where an interrupted scan stopped
@@ -339,6 +342,7 @@ contract ShieldReactive is AbstractReactive {
         }
         if (keyHi - keyLo >= MAX_BUCKETS_PER_TICK) keyLo = keyHi - MAX_BUCKETS_PER_TICK + 1;
         for (uint256 k = keyHi + 1; k > keyLo; --k) {
+            if (!_occupied(asset, k - 1)) continue; // empty bucket: no cold read of its list
             address[] storage b = buckets[asset][k - 1];
             for (uint256 i; i < b.length; ++i) {
                 if (gasleft() <= floor) {
@@ -466,10 +470,16 @@ contract ShieldReactive is AbstractReactive {
         }
         uint256 key = price / bucketWidths[asset];
         address[] storage b = buckets[asset][key];
+        if (b.length == 0) occupied[asset][key >> 8] |= 1 << (key & 255);
         p.slot = uint8(2 + asset);
         p.bucketKey = key;
         p.slotIdx = uint32(b.length);
         b.push(user);
+    }
+
+    /// One word covers 256 buckets, so after the first read every bucket in it costs a warm read (100 gas).
+    function _occupied(uint256 asset, uint256 key) internal view returns (bool) {
+        return occupied[asset][key >> 8] & (1 << (key & 255)) != 0;
     }
 
     function _unplace(Position storage p) internal {
@@ -480,6 +490,10 @@ contract ShieldReactive is AbstractReactive {
         list[idx] = last;
         positions[last].slotIdx = uint32(idx);
         list.pop();
+        if (list.length == 0 && p.slot > 1) {
+            uint256 key = p.bucketKey;
+            occupied[p.slot - 2][key >> 8] &= ~(1 << (key & 255));
+        }
         p.slot = 0;
     }
 

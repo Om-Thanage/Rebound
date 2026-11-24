@@ -37,6 +37,7 @@ contract MockAavePool {
         MockAToken aToken;
     }
 
+    address public immutable owner;
     MockERC20 public immutable weth;
     MockERC20 public immutable usdc;
     MockAaveOracle public immutable oracle;
@@ -54,24 +55,33 @@ contract MockAavePool {
     event Repay(address indexed reserve, address indexed user, address indexed repayer, uint256 amount, bool useATokens);
     event Withdraw(address indexed reserve, address indexed user, address indexed to, uint256 amount);
 
+    error NotOwner();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
     constructor(MockERC20 weth_, MockERC20 usdc_, MockAaveOracle oracle_) {
+        owner = msg.sender;
         weth = weth_;
         usdc = usdc_;
         oracle = oracle_;
         _list(address(weth_), 8000, 8250, 10_500, 18); // Aave V3 Base launch values for WETH, LT rounded
     }
 
-    /// Testnet only: list another collateral asset (for example WBTC) with its own risk parameters.
+    /// Deployer only: list another collateral asset (for example WBTC) with its own risk parameters.
     function listCollateral(address asset, uint16 ltvBps, uint16 liqThresholdBps, uint16 liqBonusBps, uint8 decimals)
         external
+        onlyOwner
     {
         require(!collaterals[asset].listed, "listed");
         require(ltvBps <= liqThresholdBps && liqThresholdBps < 10_000, "bad params");
         _list(asset, ltvBps, liqThresholdBps, liqBonusBps, decimals);
     }
 
-    /// Testnet only: set simple yearly interest on debt, to show the mirrored debt drifting between snapshots.
-    function setBorrowRate(uint256 bps) external {
+    /// Deployer only: set simple yearly interest on debt, to show the mirrored debt drifting between snapshots.
+    function setBorrowRate(uint256 bps) external onlyOwner {
         require(bps <= 10_000, "rate");
         borrowRateBps = bps;
     }

@@ -7,12 +7,20 @@ import {MockAggregator, MockAggregatorProxy} from "./MockAggregator.sol";
 /// Chainlink-style source; `setAssetPrice` pushes a new answer into that source so the demo can simulate a crash,
 /// and the price event comes from the aggregator (`AnswerUpdated`), as it would on mainnet.
 contract MockAaveOracle {
+    address public immutable owner;
     mapping(address => MockAggregatorProxy) public sources;
 
     event AssetSourceUpdated(address indexed asset, address indexed source);
 
-    /// Testnet only: anyone may point an asset at a source.
+    error NotOwner();
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    /// Only the deployer may point an asset at a source (Aave's pool admin does this on mainnet).
     function setAssetSource(address asset, MockAggregatorProxy source) external {
+        if (msg.sender != owner) revert NotOwner();
         sources[asset] = source;
         emit AssetSourceUpdated(asset, address(source));
     }

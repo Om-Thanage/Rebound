@@ -69,6 +69,15 @@ contract MockSystem {
         return 0;
     }
 
+    function debts(address) external pure returns (uint256) {
+        return 0;
+    }
+
+    /// What Reactive holds for a contract to pay its execution (fixed here; read by the dashboard and status.sh).
+    function reserves(address) external pure returns (uint256) {
+        return 5 ether;
+    }
+
     receive() external payable {}
 }
 
@@ -132,9 +141,9 @@ contract ShieldTest is Test {
         usdc = new MockERC20("Test USD Coin", "tUSDC", 6);
         wbtc = new MockERC20("Test Wrapped BTC", "tWBTC", 8);
         oracle = new MockAaveOracle();
-        aggWeth = new MockAggregator();
-        aggWbtc = new MockAggregator();
-        aggLead = new MockAggregator();
+        aggWeth = new MockAggregator(address(oracle)); // the oracle's open setAssetPrice may post to it
+        aggWbtc = new MockAggregator(address(oracle));
+        aggLead = new MockAggregator(address(0)); // owner only
         proxyWeth = new MockAggregatorProxy(aggWeth);
         proxyWbtc = new MockAggregatorProxy(aggWbtc);
         oracle.setAssetSource(address(weth), proxyWeth);
@@ -796,6 +805,26 @@ contract ShieldTest is Test {
         assertLt(g - gasleft(), 900_000);
     }
 
+    /// What a price event costs when it rescues nobody: every event pays this, so it sets the lREACT runway.
+    function test_idleTickGas() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _openLoan(bob, 1 ether, 1000e6);
+        _protect(bob, 1 ether);
+        vm.recordLogs();
+        oracle.setAssetPrice(address(weth), 1990e8);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        IReactive.LogRecord memory l = _toRecord(logs[logs.length - 1], ORIGIN);
+        vm.cool(address(rc)); // on chain each reactive transaction starts with cold storage
+        vm.prank(SYSTEM_ADDR);
+        uint256 g = gasleft();
+        rc.react(l);
+        uint256 used = g - gasleft();
+        emit log_named_uint("idle tick gas (cold)", used);
+        assertEq(sys.callbackCount(), 0);
+        assertLt(used, 50_000, "empty buckets must not cost a cold read each (was 78k before the bitmap)");
+    }
+
     // ---- several collateral assets
 
     function test_multiAssetLoanIsMirroredAndRescued() public {
@@ -829,7 +858,7 @@ contract ShieldTest is Test {
     // ---- following the Chainlink aggregator
 
     function test_followsAggregatorReplacement() public {
-        MockAggregator next = new MockAggregator();
+        MockAggregator next = new MockAggregator(address(oracle));
         vm.recordLogs();
         proxyWeth.confirmAggregator(next);
         _relayAll();
@@ -898,6 +927,80 @@ contract ShieldTest is Test {
         assertEq(watchFees, 0.002 ether);
         assertEq(rescueFees, 0);
         assertEq(address(s2).balance, 0.002 ether, "unwrapped to ETH for gas");
+    }
+
+    // ---- review fixes
+
+    /// Admin functions on the mocks are the deployer's alone: an open aggregator swap or source change could point
+    /// the oracle at a contract that reverts and stop every price read for everyone.
+    function test_mockAdminIsDeployerOnly() public {
+        MockAggregator evil = new MockAggregator(address(0));
+        vm.startPrank(bob);
+        vm.expectRevert(MockAggregatorProxy.NotOwner.selector);
+        proxyWeth.confirmAggregator(evil);
+        vm.expectRevert(MockAaveOracle.NotOwner.selector);
+        oracle.setAssetSource(address(weth), MockAggregatorProxy(address(evil)));
+        vm.expectRevert(MockAavePool.NotOwner.selector);
+        pool.setBorrowRate(10_000);
+        vm.expectRevert(MockAavePool.NotOwner.selector);
+        pool.listCollateral(address(usdc), 1, 1, 10_000, 6);
+        vm.expectRevert(MockAggregator.NotAllowed.selector);
+        aggWeth.updateAnswer(1);
+        vm.expectRevert(MockAggregator.NotAllowed.selector);
+        aggLead.updateAnswer(1);
+        // the demo's price moves stay open, through the oracle
+        oracle.setAssetPrice(address(weth), 1999e8);
+        vm.stopPrank();
+        assertEq(oracle.getAssetPrice(address(weth)), 1999e8);
+    }
+
+    function test_setupPublishesOneSnapshot() public {
+        vm.recordLogs();
+        vm.prank(alice);
+        shield.setup(1.15e18, 1.4e18, 0, LiquidationShield.Mode.Combined, 1 ether, 100e6);
+        assertEq(_countSnapshots(vm.getRecordedLogs()), 1);
+        assertEq(_reserve(alice), 1 ether);
+        assertEq(_repayReserve(alice), 100e6);
+    }
+
+    function test_demoRunPublishesOneSnapshot() public {
+        DemoLoan demo = _deployDemo();
+        for (uint256 r; r < 3; ++r) {
+            vm.recordLogs();
+            demo.runWithMode(r == 1 ? LiquidationShield.Mode.Repay : LiquidationShield.Mode.Collateral);
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+            assertEq(_countSnapshots(logs), 1, "one reactive transaction for the reset, not one per change");
+            for (uint256 i; i < logs.length; ++i) _relayOne(logs[i]);
+            _deliverLastCallback();
+            vm.warp(block.timestamp + 61);
+        }
+    }
+
+    /// Repay mode with an empty repay reserve tops up with WETH instead of silently dropping protection.
+    function test_repayModeFallsBackToTopUpWhenRepayReserveIsEmpty() public {
+        _movePrice(2000e8);
+        _protectAlice(1 ether);
+        _configure(alice, 0, LiquidationShield.Mode.Repay); // no repay reserve at all
+        assertEq(rc.userCount(), 1, "still watched");
+        _movePrice(1600e8);
+        vm.expectEmit(true, false, false, false, address(shield));
+        emit LiquidationShield.RepayReserveEmpty(alice);
+        _deliverLastCallback();
+        assertGt(pool.collateral(alice), 1 ether, "topped up with WETH");
+        assertGe(_hf(alice), 1.4e18);
+    }
+
+    function _countSnapshots(Vm.Log[] memory logs) internal view returns (uint256 n) {
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter == address(shield) && uint256(logs[i].topics[0]) == rc.SNAPSHOT_TOPIC()) n++;
+        }
+    }
+
+    function _relayOne(Vm.Log memory lg) internal {
+        if (lg.topics.length == 0 || !_subscribed(lg.emitter, uint256(lg.topics[0]))) return;
+        IReactive.LogRecord memory l = _toRecord(lg, lg.emitter == address(aggLead) ? LEAD : ORIGIN);
+        vm.prank(SYSTEM_ADDR);
+        rc.react(l);
     }
 
     // ---- DemoLoan: the dashboard's one-click rescue
