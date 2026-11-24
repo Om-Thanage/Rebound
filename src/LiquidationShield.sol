@@ -118,7 +118,6 @@ contract LiquidationShield is AbstractCallback {
     error BadHealthFactors();
     error BadConfig();
     error FeeTooHigh();
-    error NotYourPosition();
     error UnderTrigger(uint256 hf);
     error TokenCallFailed(address token);
     error Overflow();
@@ -234,11 +233,10 @@ contract LiquidationShield is AbstractCallback {
     }
 
     /// @notice Re-publish your position to the reactive contract (call after borrowing more or adding collateral).
-    /// Only the borrower may call it, so nobody else can spend the reactive contract's gas on your position.
-    function sync(address user) external {
-        if (msg.sender != user) revert NotYourPosition();
-        _settleWatchFee(user, protections[user]);
-        _snapshot(user);
+    /// It only ever publishes the caller's own position, so nobody else can spend the reactive contract's gas on it.
+    function sync() external {
+        _settleWatchFee(msg.sender, protections[msg.sender]);
+        _snapshot(msg.sender);
     }
 
     // ---------------------------------------------------------------- reactive callbacks
@@ -453,8 +451,10 @@ contract LiquidationShield is AbstractCallback {
         return p.reserve > 0 || p.repayReserve > 0;
     }
 
+    /// Watched only with a WETH reserve, in every mode: it pays the watch fee and each rescue's fee (callback gas).
+    /// A repay reserve alone would be watched for free.
     function _isActive(Protection storage p) internal view returns (bool) {
-        return p.triggerHF > 0 && _hasReserveFor(p);
+        return p.triggerHF > 0 && p.reserve > 0;
     }
 
     /// Charges the watch fee owed since the last settlement, from the WETH reserve, and unwraps it for gas.

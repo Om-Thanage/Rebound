@@ -783,11 +783,26 @@ contract ShieldTest is Test {
 
     // ---- griefing the reactive contract
 
+    /// The WETH reserve pays the watch fee and rescue fees. A repay reserve alone is not watched (it would be free).
+    function test_repayReserveAloneIsNotWatchedForFree() public {
+        _openLoan(bob, 1 ether, 1200e6);
+        vm.recordLogs();
+        vm.prank(bob);
+        shield.setup(1.15e18, 1.4e18, 0, LiquidationShield.Mode.Repay, 0, 100e6);
+        _relayAll();
+        assertEq(rc.userCount(), 0, "USDC only: not watched");
+
+        _protect(bob, 0.01 ether); // keeps repay mode, adds WETH for fees
+        assertEq(rc.userCount(), 1, "watched once there is WETH for fees");
+    }
+
+    /// sync() only ever publishes the caller's own position: a stranger with nothing protected publishes nothing.
     function test_strangerCannotSyncSomeoneElse() public {
         _protectAlice(1 ether);
+        vm.recordLogs();
         vm.prank(bob);
-        vm.expectRevert(LiquidationShield.NotYourPosition.selector);
-        shield.sync(alice);
+        shield.sync();
+        assertEq(_countSnapshots(vm.getRecordedLogs()), 0);
     }
 
     function test_emptyProtectionsAreNotPublished() public {
@@ -797,7 +812,7 @@ contract ShieldTest is Test {
             vm.prank(sybil);
             shield.protect(1.15e18, 1.4e18, 0); // no reserve
             vm.prank(sybil);
-            shield.sync(sybil);
+            shield.sync();
             assertEq(vm.getRecordedLogs().length, 0, "no snapshot, so no reactive gas spent");
         }
         assertEq(rc.userCount(), 0);
@@ -1061,7 +1076,7 @@ contract ShieldTest is Test {
         weth.approve(address(s2), type(uint256).max);
         s2.protect(1.15e18, 1.4e18, 1 ether);
         vm.warp(block.timestamp + 2 days);
-        s2.sync(alice);
+        s2.sync();
         vm.stopPrank();
         (uint128 reserve,,,,,,,,) = s2.protections(alice);
         assertEq(reserve, 1 ether - 0.002 ether);
