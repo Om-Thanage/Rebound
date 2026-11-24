@@ -62,6 +62,9 @@ contract ShieldReactive is AbstractReactive {
     uint256 internal constant NO_ASSET = type(uint256).max;
 
     uint256 public immutable originChainId;
+    /// Reactive Network emits its CronN events from this address, not from the Omni system contract at 0x8888…
+    /// (checked on Lasna on 2026-11-24: Cron1, Cron10 and Cron100 logs all come from here).
+    address public constant CRON_SOURCE = 0x0000000000000000000000000000000000fffFfF;
     uint256 public immutable reactiveChainId;
     address public immutable shield;
     uint256 public immutable cronTopic;
@@ -138,7 +141,7 @@ contract ShieldReactive is AbstractReactive {
         }
         _subscribe(cfg.originChainId, cfg.shield, SNAPSHOT_TOPIC);
         if (cfg.leadChainId != 0) _subscribe(cfg.leadChainId, cfg.leadFeed, ANSWER_UPDATED_TOPIC);
-        if (cfg.cronTopic != 0) _subscribe(block.chainid, address(SYSTEM), cfg.cronTopic);
+        if (cfg.cronTopic != 0) _subscribe(block.chainid, CRON_SOURCE, cfg.cronTopic);
     }
 
     function react(LogRecord calldata log) external onlySystem {
@@ -153,7 +156,7 @@ contract ShieldReactive is AbstractReactive {
                 _onAggregatorConfirmed(proxyAsset[log.contractAddress] - 1, address(uint160(log.topic2)));
             }
         } else if (
-            cronTopic != 0 && log.chainId == reactiveChainId && log.contractAddress == address(SYSTEM)
+            cronTopic != 0 && log.chainId == reactiveChainId && log.contractAddress == CRON_SOURCE
                 && log.topic0 == cronTopic
         ) {
             _onCron();

@@ -264,7 +264,7 @@ contract ShieldTest is Test {
     function _cron() internal {
         IReactive.LogRecord memory l;
         l.chainId = block.chainid;
-        l.contractAddress = SYSTEM_ADDR;
+        l.contractAddress = rc.CRON_SOURCE(); // where Lasna really emits CronN, not the system contract
         l.topic0 = CRON_TOPIC;
         vm.prank(SYSTEM_ADDR);
         rc.react(l);
@@ -337,7 +337,7 @@ contract ShieldTest is Test {
         assertEq(sys.subscriptions(), 7);
         (uint256 chainId, address emitter, uint256 topic) = sys.subs(6);
         assertEq(chainId, block.chainid, "CRON comes from Reactive Network itself");
-        assertEq(emitter, SYSTEM_ADDR);
+        assertEq(emitter, 0x0000000000000000000000000000000000fffFfF, "CronN comes from the legacy system address");
         assertEq(topic, CRON_TOPIC);
         (chainId, emitter,) = sys.subs(5);
         assertEq(chainId, LEAD);
@@ -797,7 +797,7 @@ contract ShieldTest is Test {
         vm.warp(block.timestamp + 61);
         IReactive.LogRecord memory c;
         c.chainId = block.chainid;
-        c.contractAddress = SYSTEM_ADDR;
+        c.contractAddress = rc.CRON_SOURCE();
         c.topic0 = CRON_TOPIC;
         vm.prank(SYSTEM_ADDR);
         g = gasleft();
@@ -894,6 +894,18 @@ contract ShieldTest is Test {
         assertEq(sys.callbackCount(), 2, "the sweep found it");
         _deliverLastCallback();
         assertGe(_hf(alice), 1.4e18);
+    }
+
+    function test_cronOnlyFromTheRealCronSource() public {
+        IReactive.LogRecord memory l;
+        l.chainId = block.chainid;
+        l.contractAddress = SYSTEM_ADDR; // the Omni system contract does not emit CronN
+        l.topic0 = CRON_TOPIC;
+        vm.prank(SYSTEM_ADDR);
+        rc.react(l);
+        assertEq(rc.cronTicks(), 0);
+        _cron();
+        assertEq(rc.cronTicks(), 1);
     }
 
     function test_cronRefreshesStaleMirrorAfterInterest() public {
