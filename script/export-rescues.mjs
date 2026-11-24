@@ -35,4 +35,4 @@ const out = { shield: env.SHIELD, toBlock: head, rescued: await logs(TOPICS.resc
 console.assert(out.rescued.every((l) => l.topics[0] === TOPICS.rescued), 'unexpected topic');
 mkdirSync(new URL('../dashboard/data/', import.meta.url), { recursive: true });
 writeFileSync(new URL('../dashboard/data/rescues.json', import.meta.url), JSON.stringify(out, null, 1) + '\n');
-console.log(`${out.rescued.length} rescues, ${out.detail.length} repay details`);
+console.log(`${out.rescued.length} rescues, ${out.detail.length} rescue details (repaid debt and price hint per rescue)`);

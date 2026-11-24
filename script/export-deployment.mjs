@@ -8,7 +8,7 @@ const need = ['DEMO', 'WETH', 'ORACLE', 'POOL', 'SHIELD', 'REACTIVE'];
 const missing = need.filter((k) => !env[k]);
 if (missing.length) throw new Error(`deployments.env is missing ${missing.join(', ')}`);
 
-const out = { user: env.DEMO, weth: env.WETH, oracle: env.ORACLE, pool: env.POOL, shield: env.SHIELD, reactive: env.REACTIVE };
+const out = { user: env.DEMO, deployer: env.DEPLOYER, weth: env.WETH, oracle: env.ORACLE, pool: env.POOL, shield: env.SHIELD, reactive: env.REACTIVE };
 if (process.env.DASHBOARD_RPC) out.rpc = process.env.DASHBOARD_RPC; // local testing only
 if (process.env.DASHBOARD_LASNA_RPC) out.lasnaRpc = process.env.DASHBOARD_LASNA_RPC;
 mkdirSync(new URL('../dashboard/data/', import.meta.url), { recursive: true });

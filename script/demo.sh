@@ -36,9 +36,10 @@ start=$(date +%s.%N)
 echo "price tx $crash_tx (block $crash_block)"
 
 topic=$(cast keccak "Rescued(address,uint256,uint256,uint256,uint256,uint256)")
+me=$(cast abi-encode "f(address)" "$DEPLOYER") # only this loan's rescue, not a visitor's demo run
 for _ in $(seq 1 120); do
   # public RPC caps eth_getLogs at 200 blocks (~40s of Base Sepolia's 200ms blocks)
-  log=$(cast logs --from-block "$crash_block" --to-block $((crash_block + 199)) --address "$SHIELD" "$topic"     --rpc-url "$BASE_SEPOLIA_RPC" --json 2>/dev/null | jq -c '(if type == "object" then .data else . end) | if type == "array" then (.[-1] // empty) else empty end' || true)
+  log=$(cast logs --from-block "$crash_block" --to-block $((crash_block + 199)) --address "$SHIELD" "$topic" "$me"     --rpc-url "$BASE_SEPOLIA_RPC" --json 2>/dev/null | jq -c '(if type == "object" then .data else . end) | if type == "array" then (.[-1] // empty) else empty end' || true)
   [ -n "$log" ] && break; sleep 0.5
 done
 [ -z "$log" ] && { echo "No rescue within 60s"; exit 1; }

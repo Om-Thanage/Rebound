@@ -19,14 +19,15 @@ mkdir -p results
 
 RESCUED=$(cast keccak "Rescued(address,uint256,uint256,uint256,uint256,uint256)")
 REQUESTED=$(cast keccak "RescueRequested(address,uint256,uint256,uint256)")
+ME_TOPIC=$(cast abi-encode "f(address)" "$DEPLOYER") # only this loan's events: a visitor's demo rescue is not a round
 BASE_COLL=4000000000000000 # 0.004 WETH = HF 1.2 at $2000 with 5.5 USDC debt
 
 send() { cast send "$@" $B > /dev/null; }
 field() { jq -r "$1" 2>/dev/null || true; }
 coll() { cast call "$POOL" "collateral(address)(uint256)" "$DEPLOYER" --rpc-url "$BASE_SEPOLIA_RPC" | awk '{print $1}'; }
 mirrored_coll() { cast call "$REACTIVE" "collateralOf(address,uint256)(uint256)" "$DEPLOYER" 0 $R | awk '{print $1}'; }
-logs() { # chain-rpc from to address topic -> first matching log as compact JSON, or nothing
-  cast logs --from-block "$2" --to-block "$3" --address "$4" "$5" --rpc-url "$1" --json 2>/dev/null \
+logs() { # chain-rpc from to address topic0 topic1 -> first matching log as compact JSON, or nothing
+  cast logs --from-block "$2" --to-block "$3" --address "$4" "$5" "$6" --rpc-url "$1" --json 2>/dev/null \
     | jq -c '(if type == "object" then .data else . end) | if type == "array" then (.[0] // empty) else empty end' 2>/dev/null || true
 }
 
@@ -51,19 +52,21 @@ for round in $(seq "$START" $((START + ROUNDS - 1))); do
   # ---- wait for the rescue on Base (log window kept under the RPC's 200-block cap)
   rescue=""
   for _ in $(seq 1 120); do
-    rescue=$(logs "$BASE_SEPOLIA_RPC" "$price_block" $((price_block + 199)) "$SHIELD" "$RESCUED")
+    rescue=$(logs "$BASE_SEPOLIA_RPC" "$price_block" $((price_block + 199)) "$SHIELD" "$RESCUED" "$ME_TOPIC")
     [ -n "$rescue" ] && break; sleep 0.5
   done
   if [ -z "$rescue" ]; then echo "round $round: no rescue within 60s"; echo "$round,$price_tx,$price_block,,,,,,,," >> "$OUT"; continue; fi
   rescue_tx=$(echo "$rescue" | field .transactionHash)
   rescue_block=$(( $(echo "$rescue" | field .blockNumber) ))
 
-  request=$(logs "$REACTIVE_LASNA_RPC" "$lasna_from" latest "$REACTIVE" "$REQUESTED")
+  request=$(logs "$REACTIVE_LASNA_RPC" "$lasna_from" latest "$REACTIVE" "$REQUESTED" "$ME_TOPIC")
   req_block=""; to_reactive=""; lasna_tx=""
   if [ -n "$request" ]; then
     req_block=$(( $(echo "$request" | field .blockNumber) ))
     lasna_tx=$(echo "$request" | field .transactionHash)
-    to_reactive=$(( $(cast block "$req_block" -f timestamp $R) - price_ts ))
+    # a failed lookup must not abort the round or leave a half-written row; script/backfill-bench.mjs fills gaps later
+    lasna_ts=$(cast block "$req_block" -f timestamp $R 2>/dev/null || true)
+    [ -n "$lasna_ts" ] && to_reactive=$((lasna_ts - price_ts))
   fi
 
   blocks=$((rescue_block - price_block))

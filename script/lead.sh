@@ -31,6 +31,7 @@ cast send "$LEAD_AGG" "updateAnswer(int256)" "${LEAD}00000000" --rpc-url "$LEAD_
 lead_at=$(date +%s.%N)
 
 topic=$(cast keccak "Rescued(address,uint256,uint256,uint256,uint256,uint256)")
+me=$(cast abi-encode "f(address)" "$DEPLOYER") # only this loan's rescue, not a visitor's demo run
 moved=0
 for _ in $(seq 1 240); do
   now=$(date +%s.%N)
@@ -39,7 +40,7 @@ for _ in $(seq 1 240); do
     cast send "$ORACLE" "setAssetPrice(address,uint256)" "$WETH" "${BASE}00000000" $B > /dev/null
     moved=1
   fi
-  log=$(cast logs --from-block "$start_block" --address "$SHIELD" "$topic" --rpc-url "$BASE_SEPOLIA_RPC" --json 2>/dev/null \
+  log=$(cast logs --from-block "$start_block" --address "$SHIELD" "$topic" "$me" --rpc-url "$BASE_SEPOLIA_RPC" --json 2>/dev/null \
     | jq -c '(if type == "object" then .data else . end) | if type == "array" then (.[-1] // empty) else empty end' || true)
   if [ -n "$log" ]; then
     secs=$(awk -v a="$(date +%s.%N)" -v b="$lead_at" 'BEGIN{printf "%.1f", a-b}')
