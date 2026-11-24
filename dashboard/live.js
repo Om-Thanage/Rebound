@@ -460,7 +460,12 @@ async function runRescue() {
         const what = [supplied > 0n ? `added ${eth(supplied, 5)} WETH` : '', repaid > 0n ? `repaid ${(Number(repaid) / 1e6).toFixed(2)} USDC` : '']
           .filter(Boolean).join(' and ');
         step(5, 'done', `${what.charAt(0).toUpperCase() + what.slice(1)}, fee ${eth(fee, 4)}. Health factor ${hf(after)}, ${blocks} blocks (${(blocks * 0.2).toFixed(1)} s) after the drop. ${txLink(logs[0].transactionHash, 'Rescue tx')}`);
-        status(`Rescued ${(blocks * 0.2).toFixed(1)} s after the price drop. The loan on the right is safe again.`);
+        // a short reserve gives a partial rescue, so say what the returned health factor actually means
+        const outcome = after >= 1395n * 10n ** 15n ? 'The loan on the right is back at its 1.40 target.'
+          : after >= 115n * 10n ** 16n ? `The loan is back above its 1.15 trigger (HF ${hf(after)}), short of the 1.40 target.`
+          : after >= 10n ** 18n ? `Partial rescue: HF ${hf(after)} is still under the 1.15 trigger. Top up the reserve.`
+          : `Partial rescue: HF ${hf(after)} is still under 1.0, so the loan can be liquidated. Top up the reserve.`;
+        status(`Rescued ${(blocks * 0.2).toFixed(1)} s after the price drop. ${outcome}`);
         safe(readLoan); safe(readRescues);
         return;
       }

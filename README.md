@@ -9,7 +9,8 @@ earlier when the price is falling fast. The rescue lands about seven Base blocks
 deployed version) after the price event, with no keeper bot and no server. It either adds collateral or repays debt,
 by the smallest amount that restores the borrower's target. It charges **0.3% of the value it moves** (floor
 0.0001 ETH, gas included). That fee is unwrapped to ETH inside the shield, where Reactive's callback proxy takes
-the callback gas from it, so the destination side runs with no one topping it up.
+the callback gas from it, so the destination side runs with no one topping it up. The Reactive side is not
+self-funding yet: its lREACT is topped up by hand, and while it is empty no rescue is requested.
 
 ## In plain words
 
@@ -234,6 +235,11 @@ That is three to thirteen blocks after the price update. Liquidators act in the 
 protection comes from acting while HF is between the trigger and 1.0, and from the early request when the price is
 falling fast, not from beating liquidators to a loan that is already liquidatable.
 
+What this measures is latency on one price path: every round drops the loan to 1.08, still above 1.0, and the
+dashboard demo posts both price steps in one transaction, so no rescue can land between them. It does not
+measure how often a rescue prevents a liquidation across realistic price paths and crowded triggers (late,
+partial and missed rescues included). That is the next experiment.
+
 **Lead feed, live (second version):** `script/lead.sh 1900` moved WETH to $1,900 on Ethereum Sepolia first. The rescue landed on
 Base 0.8 s after that update confirmed, **before Base's own oracle had moved** (it followed 10 s later).
 
@@ -301,7 +307,7 @@ Sepolia ETH (for the lead feed), and Lasna lREACT (send Sepolia ETH to the fauce
 
 ```bash
 cp .env.example .env              # then put your testnet PRIVATE_KEY in .env (or point ENV_FILE at another file)
-forge test                        # 48 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
+forge test                        # 54 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
 bash script/deploy.sh             # predicts every address, deploys lead feed, Lasna, then Base; writes deployments.env
 bash script/status.sh             # health check: lREACT runway in demo runs, CRON firing, ledger, demo loan
 node script/export-deployment.mjs # points the dashboard at the new deployment
@@ -338,9 +344,22 @@ for new blocks; if Blockscout fails, it reads up to a day over RPC and says whic
 | `src/ShieldReactive.sol` | reactive contract: mirrors loans, buckets, early and lead-feed requests, aggregator following, CRON |
 | `src/DemoLoan.sol` | a protected loan anyone can reset and crash in two steps, in either mode |
 | `src/mocks/` | lending pool with Aave V3's signatures and maths (two collateral assets), Chainlink-style feeds, test tokens |
-| `test/Shield.t.sol` | 48 tests with a mocked system contract and callback proxy |
+| `test/Shield.t.sol` | 54 tests with a mocked system contract and callback proxy |
 | `script/` | deploy, demo, lead feed, benchmark, exports |
 | `dashboard/` | the live page |
+
+## Fixes after v4 (in the code, not yet deployed)
+
+An outside review of `f38a97a` found five problems. All five are fixed here with a test each (54 tests). The
+dashboard fix is live; the contract fixes take effect at the next deploy, so the deployed v4 still has them.
+
+| Problem | Fix | Live? |
+|---|---|---|
+| A partial rescue charged the 0.3% fee on the full top-up the loan needed, not on what the reserve could supply (0.003 WETH on a 0.007 WETH top-up) | The top-up and its fee are sized together, so the fee is 0.3% of what moves (or the 0.0001 ETH floor) | Next deploy |
+| The snapshot counted every aToken balance as collateral; Aave leaves out assets the borrower switched off and applies eMode thresholds, so the mirror could think a loan was safer than it is | Thresholds in the snapshot are scaled so the mirror's health factor matches the pool's own `getUserAccountData` | Next deploy |
+| An early request from a falling WBTC price sent a WBTC price as the hint, which the shield reads as a WETH price, so the rescue was skipped | Early requests come only from WETH moves; WBTC loans are rescued when they cross the trigger | Next deploy |
+| A tick that ran out of gas in a crowded bucket restarted at the front of that bucket, so later loans waited for the sweep | The scan remembers its place inside the bucket | Next deploy |
+| The dashboard said "safe again" after every rescue, even a partial one | It reads the health factor after the rescue: at target, above the trigger, under the trigger, or under 1.0 | Live |
 
 ## Limits
 
@@ -351,6 +370,8 @@ for new blocks; if Blockscout fails, it reads up to a day over RPC and says whic
   with WETH.
 - The price hint (projected or lead price) is trusted up to 5% under the oracle. A manipulated lead feed can make
   a borrower top up early with their own funds, plus one fee; it cannot move funds anywhere else.
+- The snapshot matches the pool's health factor at today's prices, spread over all assets. A real-Aave version
+  should read each asset's collateral flag and the borrower's eMode category, and be checked against a Base fork.
 - On mainnet, the REACT that pays for Reactive execution would be bought with fees and sent across with
   `depositTo`; on testnet the reactive contract is funded by hand.
 - A crash that crosses more triggers than one tick's gas budget is served over the following ticks or CRON sweeps,

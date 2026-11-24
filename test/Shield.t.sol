@@ -450,6 +450,30 @@ contract ShieldTest is Test {
         assertGt(_hf(alice), before, "still improved");
     }
 
+    /// A short reserve: the 0.3% fee is on the WETH that actually goes in, not on the full top-up the loan needed.
+    function test_partialRescueChargesFeeOnWhatItSupplies() public {
+        _protectAlice(0.05 ether); // the loan needs about 0.27 WETH at $1,600
+        uint256 collBefore = pool.collateral(alice);
+        _movePrice(1600e8);
+        _deliverLastCallback();
+        uint256 supplied = pool.collateral(alice) - collBefore;
+        (uint256 fee,,,,,) = shield.feeBreakdown();
+        assertEq(supplied + fee, 0.05 ether, "the whole reserve is used");
+        assertApproxEqAbs(fee, supplied * 30 / 10_000, 1, "0.3% of what moved");
+    }
+
+    /// The example from the review: needs about 1 WETH, has 0.01. The fee is the 0.0001 ETH floor, not 0.003.
+    function test_tinyReserveOnlyPaysTheFeeFloor() public {
+        _movePrice(2000e8);
+        _openLoan(bob, 1 ether, 1300e6);
+        _protect(bob, 0.01 ether);
+        _movePrice(1200e8);
+        _deliverLastCallback();
+        (uint256 fee,,,,,) = shield.feeBreakdown();
+        assertEq(fee, 0.0001 ether);
+        assertEq(_reserve(bob), 0);
+    }
+
     function test_feelessRescueIsCounted() public {
         _protectAlice(0.00005 ether); // below the 0.0001 ETH fee floor
         _movePrice(1600e8);
@@ -529,6 +553,55 @@ contract ShieldTest is Test {
         // sized for the projected price, so it holds the target even if the next update is that low
         oracle.setAssetPrice(address(weth), 1662.5e8);
         assertGe(_hf(alice), 1.4e18);
+    }
+
+    function _openWbtcLoan(address who, uint256 wbtcAmount, uint256 debt) internal {
+        vm.deal(who, 10 ether);
+        wbtc.mint(who, wbtcAmount);
+        vm.startPrank(who);
+        weth.deposit{value: 5 ether}();
+        weth.approve(address(shield), type(uint256).max);
+        wbtc.approve(address(pool), type(uint256).max);
+        pool.supply(address(wbtc), wbtcAmount, who, 0);
+        pool.borrow(address(usdc), debt, 2, 0, who);
+        vm.stopPrank();
+    }
+
+    /// The shield reads a hint as a WETH price, so a falling WBTC price must not send one (it would be skipped as
+    /// healthy and waste the callback). Crossing the trigger still asks, without a hint.
+    function test_wbtcFallAsksOnlyOnceTheTriggerIsCrossed() public {
+        _openWbtcLoan(bob, 0.05e8, 1900e6); // $3,000 of WBTC at LT 0.78: HF 1.232; trigger at about $56,026
+        _protect(bob, 0.5 ether);
+        uint256 calls = sys.callbackCount();
+        _movePrice(address(wbtc), 57_500e8); // HF 1.180; one more $2,500 step would be 1.129
+        assertEq(sys.callbackCount(), calls, "no early request for WBTC");
+        assertEq(rc.earlyRequests(), 0);
+        _movePrice(address(wbtc), 55_000e8); // HF 1.129: under the trigger
+        assertEq(sys.callbackCount(), calls + 1);
+        assertEq(_decodeHint(calls), 0);
+        _deliverLastCallback();
+        assertEq(shield.rescueCount(), 1);
+    }
+
+    /// Aave leaves out collateral the borrower switched off. The snapshot follows the pool's own account data, so
+    /// the mirror does not think such a loan is safer than it is.
+    function test_snapshotFollowsThePoolWhenCollateralIsSwitchedOff() public {
+        _movePrice(2000e8);
+        _movePrice(address(wbtc), 60_000e8);
+        _openLoan(bob, 1 ether, 1200e6);
+        wbtc.mint(bob, 0.01e8);
+        vm.startPrank(bob);
+        wbtc.approve(address(pool), type(uint256).max);
+        pool.supply(address(wbtc), 0.01e8, bob, 0); // $600 more on paper
+        vm.stopPrank();
+        // as if bob disabled WBTC as collateral: the pool counts only the WETH (HF 1.375)
+        vm.mockCall(
+            address(pool),
+            abi.encodeWithSelector(MockAavePool.getUserAccountData.selector, bob),
+            abi.encode(uint256(2000e8), uint256(1200e8), uint256(0), uint256(8250), uint256(8000), uint256(1.375e18))
+        );
+        _protect(bob, 0.5 ether);
+        assertApproxEqRel(rc.mirroredHF(bob), 1.375e18, 0.002e18, "mirror matches the pool, not the balances");
     }
 
     function test_slowFallDoesNotTriggerEarly() public {
@@ -747,6 +820,28 @@ contract ShieldTest is Test {
         uint256 checked = rc.positionsChecked() - checkedBefore;
         assertGt(checked, 0);
         assertLt(checked, 20, "a tick touches a few buckets, not every loan");
+    }
+
+    /// Many loans with the same trigger share one bucket. A tick that runs out of budget in it must carry on from
+    /// where it stopped, not re-walk the front of the bucket.
+    function test_interruptedScanResumesInsideACrowdedBucket() public {
+        _movePrice(2000e8);
+        for (uint256 i; i < 150; ++i) {
+            address u = address(uint160(0xB000 + i));
+            _openLoan(u, 1 ether, 1300e6); // all trigger at about $1,812: one bucket
+            _protect(u, 0.5 ether);
+        }
+        sys.setLight(true);
+        _movePrice(1700e8);
+        uint256 first = sys.lightCount();
+        assertGt(first, 0);
+        assertLt(first, 150, "one tick can't serve them all");
+        assertEq(rc.resumeIdx(0), first);
+
+        uint256 checkedBefore = rc.positionsChecked();
+        _movePrice(1699e8);
+        assertGt(sys.lightCount(), first);
+        assertLe(rc.positionsChecked() - checkedBefore, 151 - first, "did not re-check the front of the bucket");
     }
 
     /// The worst tick: a crash that puts every loan under its trigger at once. Each check is capped per tick, so

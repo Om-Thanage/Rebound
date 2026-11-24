@@ -406,14 +406,21 @@ contract LiquidationShield is AbstractCallback {
             }
         }
 
-        uint256 movedWei = repaidBase * 1e18 / c.price + c.supply;
-        c.fee = movedWei * feeBps / 10_000;
-        if (c.fee < minFeeWei) c.fee = minFeeWei;
+        uint256 repaidWei = repaidBase * 1e18 / c.price;
+        c.fee = _fee(repaidWei + c.supply);
         uint256 reserve = p.reserve;
         if (c.supply + c.fee > reserve) {
-            // Not enough reserve: keep the fee if possible, put the rest in (a partial rescue still helps).
+            // Not enough reserve: a partial rescue still helps. Size the top-up and its fee together, so the fee is
+            // on what actually moves: supply + (repaidWei + supply) * bps / 1e4 = reserve.
+            uint256 need = c.supply;
+            if (need > 0) {
+                uint256 a = reserve * 10_000;
+                uint256 b = repaidWei * feeBps;
+                uint256 s = a > b ? (a - b) / (10_000 + feeBps) : 0;
+                c.fee = _fee(repaidWei + (s < need ? s : need));
+            }
             if (reserve > c.fee) {
-                c.supply = reserve - c.fee;
+                c.supply = reserve - c.fee < need ? reserve - c.fee : need;
             } else if (c.supply > 0) {
                 c.supply = reserve;
                 c.fee = 0;
@@ -472,16 +479,36 @@ contract LiquidationShield is AbstractCallback {
         if (!active && !p.mirrored) return;
         p.mirrored = active;
 
-        uint256 n = collateralAssets.length;
-        uint256[] memory amounts = new uint256[](n);
-        uint256[] memory lts = new uint256[](n);
-        for (uint256 i; i < n; ++i) {
-            amounts[i] = IERC20Lite(aTokens[i]).balanceOf(user);
-            lts[i] = _liqThreshold(collateralAssets[i]);
-        }
-        (, uint256 debtBase,,,,) = pool.getUserAccountData(user);
+        (uint256[] memory amounts, uint256[] memory lts, uint256 debtBase) = _collateral(user);
         uint256 cooldownUntil = p.lastRescueAt == 0 ? 0 : p.lastRescueAt + COOLDOWN;
         emit PositionSnapshot(user, amounts, lts, debtBase, p.triggerHF, cooldownUntil, active);
+    }
+
+    /// Per-asset collateral and thresholds for a snapshot, plus the debt (base currency).
+    function _collateral(address user) internal view returns (uint256[] memory amounts, uint256[] memory lts, uint256 debtBase) {
+        uint256 n = collateralAssets.length;
+        amounts = new uint256[](n);
+        lts = new uint256[](n);
+        uint256 naiveLt; // collateral value x threshold as the mirror would compute it from balances alone
+        for (uint256 i; i < n; ++i) {
+            address asset = collateralAssets[i];
+            uint256 cfg = pool.getConfiguration(asset);
+            amounts[i] = IERC20Lite(aTokens[i]).balanceOf(user);
+            lts[i] = (cfg >> 16) & 0xFFFF;
+            if (amounts[i] > 0) naiveLt += amounts[i] * oracle.getAssetPrice(asset) / 10 ** ((cfg >> 48) & 0xFF) * lts[i];
+        }
+        uint256 collBase;
+        uint256 ltAvg;
+        (collBase, debtBase,, ltAvg,,) = pool.getUserAccountData(user);
+        // Aave leaves out balances the borrower has not enabled as collateral and applies eMode thresholds; the
+        // balances above can't see either. Scale the thresholds so the mirror's health factor matches the pool's.
+        // shortcut: exact at today's prices only, and spread over all assets; per-asset flags need a real-Aave reader.
+        uint256 poolLt = collBase * ltAvg;
+        if (naiveLt > 0 && (poolLt > naiveLt + naiveLt / 1000 || poolLt + naiveLt / 1000 < naiveLt)) {
+            for (uint256 i; i < n; ++i) {
+                lts[i] = lts[i] * poolLt / naiveLt;
+            }
+        }
     }
 
     function _skip(address user, uint256 hf, string memory reason) internal {
@@ -520,6 +547,11 @@ contract LiquidationShield is AbstractCallback {
     function _u64(uint256 x) internal pure returns (uint64) {
         if (x > type(uint64).max) revert Overflow();
         return uint64(x);
+    }
+
+    function _fee(uint256 movedWei) internal view returns (uint256 f) {
+        f = movedWei * feeBps / 10_000;
+        if (f < minFeeWei) f = minFeeWei;
     }
 
     function _ceilDiv(uint256 a, uint256 b) internal pure returns (uint256) {

@@ -95,6 +95,7 @@ contract ShieldReactive is AbstractReactive {
     uint256 public sweepCursor;
     mapping(uint256 => uint256) public resumeKey; // asset => bucket key + 1 where an interrupted scan stopped
     mapping(uint256 => uint256) public resumeLo;
+    mapping(uint256 => uint256) public resumeIdx; // asset => position inside that bucket where the scan stopped
 
     // Work counters, read by the dashboard to show what the reactive side does.
     uint256 public priceTicks;
@@ -347,10 +348,12 @@ contract ShieldReactive is AbstractReactive {
         for (uint256 k = keyHi + 1; k > keyLo; --k) {
             if (!_occupied(asset, k - 1)) continue; // empty bucket: no cold read of its list
             address[] storage b = buckets[asset][k - 1];
-            for (uint256 i; i < b.length; ++i) {
+            // in the bucket where the last scan stopped, start where it stopped, not at its front again
+            for (uint256 i = k == resume ? resumeIdx[asset] : 0; i < b.length; ++i) {
                 if (gasleft() <= floor) {
                     resumeKey[asset] = k; // 1-based: carry on from this bucket
                     resumeLo[asset] = keyLo;
+                    resumeIdx[asset] = i;
                     return;
                 }
                 _check(b[i], asset, projected, at);
@@ -390,7 +393,8 @@ contract ShieldReactive is AbstractReactive {
             return _request(user, p, hf, 0, at, asset);
         }
         _clearRetry(p);
-        if (cooling || asset == NO_ASSET || projected == 0 || projected >= lastPrice[asset]) return;
+        // the shield reads a hint as a WETH price (asset 0), so only WETH moves may ask early
+        if (cooling || asset != 0 || projected == 0 || projected >= lastPrice[asset]) return;
         uint256 hfNext = _hfAt(user, asset, projected);
         if (hfNext < p.triggerHF) {
             earlyRequests++;
