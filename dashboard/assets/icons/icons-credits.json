@@ -11,9 +11,64 @@
     "trademark": false
   },
   {
+    "file": "ui-clock.svg",
+    "icon": "ui:clock",
+    "name": "Clock",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  },
+  {
+    "file": "ui-landmark.svg",
+    "icon": "ui:landmark",
+    "name": "Landmark",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  },
+  {
+    "file": "ui-refresh-cw.svg",
+    "icon": "ui:refresh-cw",
+    "name": "Refresh Cw",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  },
+  {
     "file": "ui-server.svg",
     "icon": "ui:server",
     "name": "Server",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  },
+  {
+    "file": "ui-shield-check.svg",
+    "icon": "ui:shield-check",
+    "name": "Shield Check",
+    "kind": "line",
+    "source": "@iconify-json/lucide@1.2.100",
+    "author": "Lucide Contributors",
+    "licence": "ISC",
+    "url": "https://github.com/lucide-icons/lucide",
+    "trademark": false
+  },
+  {
+    "file": "ui-trending-down.svg",
+    "icon": "ui:trending-down",
+    "name": "Trending Down",
     "kind": "line",
     "source": "@iconify-json/lucide@1.2.100",
     "author": "Lucide Contributors",

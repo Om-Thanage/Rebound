@@ -70,7 +70,7 @@ async function readLoan() {
   const h = acct[5];
   set('who', `Demo loan ${A.user.slice(0, 6)}…${A.user.slice(-4)} ↗`);
   document.querySelectorAll('[data-live="who"]').forEach((a) => { a.href = `${SCOUT}/address/${A.user}`; });
-  set('hf', hf(h));
+  set('hf', hfDown(h)); // the same rounding as the rescue result: never shows 1.40 for a loan under 1.40
   set('price', '$' + (Number(price) / 1e8).toLocaleString('en-US', { maximumFractionDigits: 0 }));
   set('coll', eth(coll, 4) + ' WETH');
   set('debt', (Number(debt) / 1e6).toFixed(2) + ' USDC');
@@ -79,6 +79,7 @@ async function readLoan() {
   const mode = prot.length >= 9 ? Number(prot[7]) : 0;
   if (prot.length >= 9) {
     set('repay-reserve', (Number(prot[1]) / 1e6).toFixed(2) + ' USDC');
+    set('mode', MODES[mode] || '–');
     renderMode();
   }
   set('cover', coverNote(acct, price, prot, mode));
@@ -262,7 +263,7 @@ async function readRescues() {
     li.innerHTML = `<span class="ui-avatar" data-tone="${tone}"></span><span class="ui-win__who"><span></span><a target="_blank" rel="noopener"></a></span><span class="ui-win__sub"></span><span class="ui-win__age"></span>`;
     li.children[0].textContent = avatar;
     li.children[1].firstChild.textContent = label;
-    li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)}, HF ${hf(before)}→${hf(after)}`;
+    li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)}, HF ${hfDown(before)}→${hfDown(after)}`;
     const a = li.children[1].lastChild;
     a.href = `${SCOUT}/tx/${l.transactionHash}`;
     a.title = l.transactionHash;
@@ -305,6 +306,7 @@ async function readBench() {
   if (!summary.rounds) return;
   set('median', summary.median.toFixed(1) + ' s');
   set('median-big', summary.median.toFixed(1) + ' s');
+  set('rounds', `${summary.rounds} rounds on Base Sepolia`);
   set('summary', `Median of ${summary.rounds} rounds. Fastest ${summary.min.toFixed(1)} s, p90 ${summary.p90.toFixed(1)} s, slowest ${summary.max.toFixed(1)} s.`);
   const list = $('bench')[0];
   const top = Math.max(...rows.map((x) => x.seconds), 1);
@@ -357,10 +359,9 @@ loadDeployment().then(async () => {
 });
 // only the picker's buttons: the design kit also sets data-mode="light" on <html>
 const modeButtons = document.querySelectorAll('button[data-mode]');
-// the Mode cell shows the mode the next Run a rescue uses: Adding collateral until the visitor picks Repaying debt
+// the picker sets the mode the next Run a rescue uses; the loan card's Mode cell shows what the contract holds
 function renderMode() {
   modeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.mode === String(demoMode))));
-  set('mode', MODES[demoMode]);
 }
 modeButtons.forEach((b) => b.addEventListener('click', () => {
   demoMode = b.dataset.mode === '1' ? 1 : 0;
