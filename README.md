@@ -5,11 +5,17 @@
 When a borrower's collateral price drops, an Aave-style loan can be liquidated in the same block: the liquidator
 takes a bonus (5% on WETH in Aave V3). Parapet watches the price feed itself through a Reactive contract and acts
 while the loan is still above 1.0. It requests a rescue when the loan crosses its trigger, or one price step
-earlier when the price is falling fast. The rescue lands about six Base blocks (1.4 s, median of 10 rounds on the
+earlier when the price is falling fast. The rescue lands about seven Base blocks (1.4 s, median of 10 rounds on the
 deployed version) after the price event, with no keeper bot and no server. It either adds collateral or repays debt,
 by the smallest amount that restores the borrower's target. It charges **0.3% of the value it moves** (floor
 0.0001 ETH, gas included). That fee is unwrapped to ETH inside the shield, where Reactive's callback proxy takes
 the callback gas from it, so the destination side runs with no one topping it up.
+
+> **Next deploy.** `main` carries fixes the deployed contracts don't have yet: the mocks' admin calls are
+> deployer-only (an open aggregator swap could stop every price read), a demo run sends one snapshot instead of up
+> to three, repay mode falls back to WETH top-ups when its USDC runs out, and a price event that rescues nobody
+> costs half the reactive gas. See [`docs/review.md`](docs/review.md). The addresses and numbers below are the
+> current deployment's until then.
 
 ## In plain words
 
@@ -108,6 +114,7 @@ demo loan.
 |---|---|
 | Add more WETH reserve | `protect(trigger, target, amount)` again with the extra amount |
 | Add USDC for repay mode | `depositRepayReserve(amount)` |
+| Set everything in one call | `setup(trigger, target, step, mode, wethAmount, usdcAmount)`: one snapshot, so one reactive transaction |
 | Change when and how it acts | `configure(trigger, target, step, mode)`: mode 0 adds collateral, 1 repays debt, 2 repays first then adds; `step` > 0 rescues in stages of trigger + step |
 | Take reserve back | `withdrawReserve(amount)` or `withdrawRepayReserve(amount)`; not while your loan is under its trigger |
 | Stop protection | `unprotect()` returns both reserves at any time |
@@ -250,18 +257,28 @@ Sepolia ETH (for the lead feed), and Lasna lREACT (send Sepolia ETH to the fauce
 
 ```bash
 cp .env.example .env              # then put your testnet PRIVATE_KEY in .env (or point ENV_FILE at another file)
-forge test                        # 43 tests: modes, early trigger, lead feed, buckets, CRON, worst-case gas, fuzz
+forge test                        # 48 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
 bash script/deploy.sh             # predicts every address, deploys lead feed, Lasna, then Base; writes deployments.env
+bash script/status.sh             # health check: lREACT runway in demo runs, CRON firing, ledger, demo loan
 node script/export-deployment.mjs # points the dashboard at the new deployment
 bash script/demo.sh 1800          # opens and protects a loan, crashes WETH, times the rescue
 bash script/lead.sh 1900          # moves the lead feed first: the rescue lands before Base's oracle moves
 bash script/bench.sh 20           # 20 timed rounds -> results/bench.csv (START=n continues a run)
+node script/backfill-bench.mjs    # fills to_reactive_s for rounds that have a Lasna block but no value
 node script/export-bench.mjs      # feeds the dashboard's speed section
 node script/export-rescues.mjs    # snapshots every rescue for the dashboard's list (it adds newer ones live)
 ```
 
+Top up the reactive contract before a demo or judging (one dashboard run costs about 0.111 lREACT):
+
+```bash
+cast send 0x8888888888888888888888888888888888888888 "depositTo(address)" $REACTIVE --value 50ether --rpc-url $REACTIVE_LASNA_RPC --private-key $PRIVATE_KEY
+```
+
 Open the dashboard over any static server (for example `npx serve dashboard`). It reads the contracts over
-Base Sepolia's and Lasna's public RPCs and the `Rescued` events from `data/rescues.json` plus a public RPC for anything newer, and refreshes every 10 seconds.
+Base Sepolia's and Lasna's public RPCs and refreshes every 10 seconds. The rescue list comes in three layers:
+the history shipped in `data/rescues.json`, one Blockscout call per page load for anything after it, and the RPC
+for new blocks; if Blockscout fails, it reads up to a day over RPC and says which blocks it could not load.
 
 ## Submission checklist
 
@@ -283,13 +300,15 @@ Base Sepolia's and Lasna's public RPCs and the `Rescued` events from `data/rescu
 | `src/ShieldReactive.sol` | reactive contract: mirrors loans, buckets, early and lead-feed requests, aggregator following, CRON |
 | `src/DemoLoan.sol` | a protected loan anyone can reset and crash in two steps, in either mode |
 | `src/mocks/` | lending pool with Aave V3's signatures and maths (two collateral assets), Chainlink-style feeds, test tokens |
-| `test/Shield.t.sol` | 43 tests with a mocked system contract and callback proxy |
+| `test/Shield.t.sol` | 48 tests with a mocked system contract and callback proxy |
 | `script/` | deploy, demo, lead feed, benchmark, exports |
 | `dashboard/` | the live page |
 
 ## Limits
 
 - The pool is a mock with Aave V3's interface, because Aave's testnet oracle price can't be moved for a demo.
+  Anyone may move the test price through the mock oracle (the demo depends on it); everything else on the mocks
+  (swapping a feed's aggregator, oracle sources, listing collateral, the borrow rate) is the deployer's alone.
 - Collateral top-ups and fees are in WETH. Other collateral assets are watched and priced, but a rescue tops up
   with WETH.
 - The price hint (projected or lead price) is trusted up to 5% under the oracle. A manipulated lead feed can make
