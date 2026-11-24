@@ -56,7 +56,7 @@
   .pc-big { font: 400 9cqw/1 var(--font-display); letter-spacing: -0.03em; }
   .pc-mono { font-family: var(--font-mono); font-size: max(13px, 1.7cqw); color: var(--p-muted); }
   .pc-row { display: flex; justify-content: space-between; gap: 2cqw; border-top: 1px solid rgb(35 35 35 / .12); padding-top: 1.2cqw; }
-  .pc-chip { justify-self: start; background: var(--p-accent); color: var(--p-accent-ink); padding: .4cqw 1.4cqw; font-weight: 500; }
+  .pc-chip { justify-self: start; color: #1f6b3a; font-weight: 600; }
   .pc-bar { height: 1.6cqw; background: var(--p-surface); position: relative; }
   .pc-bar i { position: absolute; inset: 0 auto 0 0; background: var(--p-ink); }
   .pc-dark { background: var(--p-inv-bg) !important; color: var(--p-inv-ink) !important; }
@@ -113,6 +113,7 @@
   /* the loan window never shrinks below what its panes need; on a short screen the section grows instead of hiding it */
   #live { height: auto; min-height: calc(var(--h, 1) * 100svh); }
   #live .app.ui { flex: 1 0 0; min-height: 520px; }
+  @media (min-width: 1024px) { #live .app.ui { min-height: 760px; } } /* two screens on desktop: room for more of the rescue history */
   #fees .panel { --p-h: 560px; }
   #how .panel { --p-h: 480px; }
   @media (max-width: 639px) { #fees .panel { --p-h: 360px; } #how .panel { --p-h: 380px; } }
@@ -184,7 +185,7 @@
   html .mode-pick .btn.btn--secondary[aria-pressed="true"]:hover { background: #3d3d3d; color: #fff; border-color: #3d3d3d; }
   .pos__warn { font-size: 13px; color: #c2410c; }
   .ledger__sub { border-top: 1px solid var(--u-line); padding-top: 12px; display: grid; gap: 8px; }
-  .fee-compare { margin-top: var(--s-8); }
+  .fee-compare { margin-top: var(--s-6); }
   .bars { padding: 24px; display: grid; gap: 16px; align-content: start; height: 100%; font-family: var(--font-text); }
   .bars__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .bars__list button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 64px 1fr 140px; gap: 10px; align-items: center; min-height: 24px; padding: 2px 4px; cursor: pointer; font-size: 14px; }
@@ -204,11 +205,14 @@
   .loop__head a { font-family: var(--font-mono); color: var(--p-ink); }
   .loop__what { font-size: 13px; line-height: 1.45; color: var(--p-muted); }
   #speed .panel { --p-h: 590px; }
-  .trip { margin: 0; padding-left: 1.4em; display: grid; gap: var(--s-3); list-style: decimal; }
+  .trip { margin: 0; padding-left: 0; display: grid; gap: var(--s-3); list-style: none; }
   .trip li { line-height: 1.5; }
-  .receipt__tx { margin-top: var(--s-6); line-height: 1.8; }
-  .receipt__note { max-width: 72ch; line-height: 1.5; margin-top: var(--s-4); }
+  .receipt__tx { margin-top: var(--s-4); line-height: 1.8; }
+  .receipt__note { max-width: 80ch; line-height: 1.5; margin-top: var(--s-2); }
   .sim__tag { color: #c2410c; }
+  /* body text that is not a label reads at 7:1 or more */
+  .mode-help, .steps__d, #speed [data-live="summary"], p.muted.receipt__note, #how p.muted { color: #484848; }
+  .hero--triptych .hero__grid > .span-5 { align-self: start; } /* top-aligned with the collage beside it */
   .simt { width: 100%; border-collapse: collapse; font: 400 15px/1.3 var(--font-text); }
   .simt th, .simt td { text-align: right; padding: 10px 8px; border-bottom: 1px solid var(--u-line); white-space: nowrap; }
   .simt th:first-child { text-align: left; }
@@ -216,9 +220,6 @@
   .simt td { font-family: var(--font-mono); }
   .simt__us th, .simt__us td { background: var(--p-accent); }
   @media (max-width: 639px) { .simt { font-size: 13px; } .simt th, .simt td { padding: 8px 4px; white-space: normal; } }
-  /* the close has no wordmark: size the footer to its content instead of filling the screen */
-  footer.closing { min-height: 0; height: auto; }
-  footer.closing > .wrap { grid-template-rows: auto auto; min-height: 0; height: auto; }
 </style>
 </head>
 <body>
@@ -271,30 +272,30 @@
 <main id="top">
   <section class="hero hero--triptych" data-enter aria-labelledby="hero-h">
     <div class="wrap"><div class="hero-text grid hero__grid">
-      <div class="span-3">
-        <h1 id="hero-h">Rescue your loan before it is liquidated</h1>
-        <p class="hero__lead">Set a trigger and a target. When the price falls, Rebound repays debt or adds collateral from your reserve, with no keeper bot. Try it on an Aave-style test loan on Base Sepolia.</p>
+      <div class="span-5">
+        <h1 id="hero-h">Rescue your loan before liquidation</h1>
+        <p class="hero__lead">Set a trigger and a target. When the price falls, Rebound repays debt or adds collateral from your reserve in 1.4 s. Try it on an Aave-style test loan.</p>
         <div class="hero__cta hero__cta--left"><a class="btn btn--secondary" href="#speed">Watch a recorded rescue</a><a class="btn btn--primary" href="#live" data-run>Run a testnet rescue</a></div>
       </div>
-      <div class="ly-collage span-8 start-5" role="img" aria-label="A recorded rescue: WETH falls to 1,800 dollars, the demo loan's health factor drops to 1.08, and the shield repays 1.257 USDC six blocks later, lifting it to 1.40">
+      <div class="ly-collage span-6 start-7" role="img" aria-label="A recorded rescue: WETH falls to 1,800 dollars, the demo loan's health factor drops to 1.08, and the shield repays 1.257 USDC six blocks later, lifting it to 1.40">
         <div class="ly-collage__set is-on">
-          <div class="ly-piece" style="left: 4%; top: 6%; width: 50%"><span class="pc-lbl">Recorded rescue · 24 Nov 2026</span><span class="pc-big">$1,800</span><span class="pc-mono">WETH, down 10% on Base Sepolia</span></div>
+          <div class="ly-piece" style="left: 4%; top: 0%; width: 50%"><span class="pc-lbl">Recorded rescue · 24 Nov 2026</span><span class="pc-big">$1,800</span><span class="pc-mono">WETH, down 10% on Base Sepolia</span></div>
           <div class="ly-piece pc-dark" style="left: 44%; top: 34%; width: 52%"><span class="pc-lbl">Health factor</span><span class="pc-big">1.08 → 1.40</span><div class="pc-bar"><i style="width:56%"></i></div><span class="pc-mono">trigger 1.15 · target 1.40</span></div>
           <div class="ly-piece" style="left: 8%; top: 64%; width: 44%"><span class="pc-chip">Rescued in 6 blocks</span><span class="pc-mono">1.257 USDC of debt repaid</span><span class="pc-mono">fee 0.0001 ETH</span></div>
         </div>
         <div class="ly-collage__set" aria-hidden="true">
-          <div class="ly-piece" style="left: 6%; top: 8%; width: 56%"><span class="pc-lbl">Price event to rescue, median</span><span class="pc-big" data-live="median">…</span><span class="pc-mono" data-live="rounds">testnet benchmark</span></div>
+          <div class="ly-piece" style="left: 6%; top: 0%; width: 56%"><span class="pc-lbl">Price event to rescue, median</span><span class="pc-big" data-live="median">…</span><span class="pc-mono" data-live="rounds">testnet benchmark</span></div>
           <div class="ly-piece" style="left: 40%; top: 50%; width: 56%"><span class="pc-lbl">Loop</span><div class="pc-row"><span>Oracle event</span><span class="pc-mono">Base</span></div><div class="pc-row"><span>ShieldReactive</span><span class="pc-mono">Lasna</span></div><div class="pc-row"><span>rescue()</span><span class="pc-mono">Base</span></div></div>
         </div>
         <div class="ly-collage__set" aria-hidden="true">
-          <div class="ly-piece pc-dark" style="left: 4%; top: 10%; width: 54%"><span class="pc-lbl">Fees against callback gas, live</span><span class="pc-big" data-live="ratio">…</span><span class="pc-mono">fee income for each unit of gas paid</span></div>
+          <div class="ly-piece pc-dark" style="left: 4%; top: 0%; width: 54%"><span class="pc-lbl">Fees against callback gas, live</span><span class="pc-big" data-live="ratio">…</span><span class="pc-mono">fee income for each unit of gas paid</span></div>
           <div class="ly-piece" style="left: 42%; top: 52%; width: 54%"><span class="pc-lbl">Rescues on the live shield</span><span class="pc-big" data-live="count">…</span><span class="pc-mono">every one is in the list below</span></div>
         </div>
       </div>
     </div></div>
   </section>
 
-  <section class="section" id="live" style="--hm: 2" aria-labelledby="live-h">
+  <section class="section" id="live" style="--h: 2; --hm: 2" aria-labelledby="live-h">
     <div class="wrap">
       <div class="grid">
         <div class="span-5 stack-4"><h2 id="live-h">A demo loan you can crash</h2><p class="loan-size">A small test loan: <b>0.004 WETH</b> (about $8 at $2,000) backing <b>5.50 USDC</b> of debt, with 0.003 WETH and 10 USDC set aside for rescues.</p><div><a class="btn btn--primary" href="#live" data-run>Run a rescue</a></div></div>
@@ -363,8 +364,7 @@
   <section class="section statement" id="fee-line" aria-labelledby="fee-h">
     <div class="wrap">
       <div data-moment="liquid-type" class="section-head" style="max-width:none">
-        <h2 id="fee-h" class="mo-lt__type">One rescue, with its receipt</h2>
-        <p>The demo loan in repay mode, 24 November 2026. Every step is a transaction you can open.</p>
+        <h2 id="fee-h" class="mo-lt__type">A Rebound rescue, with its receipt</h2>
       </div>
       <div class="grid fee-compare">
         <div class="span-3 stack-2"><p class="t-stat">1.08 → 1.40</p><p class="muted">Health factor before and after</p></div>
@@ -372,8 +372,8 @@
         <div class="span-3 stack-2"><p class="t-stat">0.0001 ETH</p><p class="muted">Fee charged, which paid the callback gas</p></div>
         <div class="span-3 stack-2"><p class="t-stat">6 blocks</p><p class="muted">1.2 s from the price update to the rescue on Base</p></div>
       </div>
-      <p class="receipt__tx">Price update <a href="https://base-sepolia.blockscout.com/tx/0xcc5ebe8ede44b64540f1d8fe3e235bd586d75f7d5f56d818905ec985648e914a" target="_blank" rel="noopener">0xcc5e…914a</a> · rescue request on Lasna <a href="https://lasna.reactscan.net/tx/0xcb9a55589ded5f6b33f7ba1da4a13171aa26afb1eb5c89963e5ab294e169c72a" target="_blank" rel="noopener">0xcb9a…c72a</a> · rescue on Base <a href="https://base-sepolia.blockscout.com/tx/0x7686f5e3f0c7ea9408346825c5c9f925987fc9555906e4fc9c3d06dace4c6933" target="_blank" rel="noopener">0x7686…6933</a></p>
-      <p class="receipt__note muted">How fees work: 0.3% of the value a rescue moves, with a floor of 0.0001 ETH, plus a watch fee of 0.00001 ETH a day while a loan is protected. On this $8 test loan the floor applies, so the fee is about 14% of the repayment. On a $100,000 loan the 0.3% applies: repaying $22,857 to reach 1.40 costs about $69, where a liquidation's 5% bonus would cost about $2,500.</p>
+      <p class="receipt__tx">Demo loan, repay mode, 24 November 2026: price update <a href="https://base-sepolia.blockscout.com/tx/0xcc5ebe8ede44b64540f1d8fe3e235bd586d75f7d5f56d818905ec985648e914a" target="_blank" rel="noopener">0xcc5e…914a</a> · rescue request on Lasna <a href="https://lasna.reactscan.net/tx/0xcb9a55589ded5f6b33f7ba1da4a13171aa26afb1eb5c89963e5ab294e169c72a" target="_blank" rel="noopener">0xcb9a…c72a</a> · rescue on Base <a href="https://base-sepolia.blockscout.com/tx/0x7686f5e3f0c7ea9408346825c5c9f925987fc9555906e4fc9c3d06dace4c6933" target="_blank" rel="noopener">0x7686…6933</a></p>
+      <p class="receipt__note muted">The fee is 0.3% of what a rescue moves, at least 0.0001 ETH, plus 0.00001 ETH a day while a loan is watched. On this $8 test loan the floor applies (about 14% of the repayment); on a $100,000 loan, a $22,857 repayment costs about $69, against about $2,500 lost to a liquidation.</p>
     </div>
   </section>
 
@@ -384,10 +384,10 @@
         <div class="span-6 stack-4">
           <p>One rescue makes a round trip between two chains. Reactive Network is what lets the watcher react to Base's price events and call back into Base, with no server or keeper bot.</p>
           <ol class="trip">
-            <li><b>Price update on Base.</b> A Chainlink-style feed emits <code>AnswerUpdated</code>. <a href="https://base-sepolia.blockscout.com/tx/0xcc5ebe8ede44b64540f1d8fe3e235bd586d75f7d5f56d818905ec985648e914a" target="_blank" rel="noopener">0xcc5e…914a</a></li>
-            <li><b>Lasna checks the trigger.</b> ShieldReactive re-prices the loans near the new price and asks for a rescue for each one under its trigger, or about to be. <a href="https://lasna.reactscan.net/tx/0xcb9a55589ded5f6b33f7ba1da4a13171aa26afb1eb5c89963e5ab294e169c72a" target="_blank" rel="noopener">0xcb9a…c72a</a></li>
-            <li><b>The Base shield re-checks the live loan</b> before it spends anything, then repays USDC or supplies WETH by the smallest amount that reaches the target. <a href="https://base-sepolia.blockscout.com/tx/0x7686f5e3f0c7ea9408346825c5c9f925987fc9555906e4fc9c3d06dace4c6933" target="_blank" rel="noopener">0x7686…6933</a></li>
-            <li><b>The updated position goes back to Lasna</b> in the same transaction's <code>PositionSnapshot</code>, so the watcher's copy is current again.</li>
+            <li><b>1. Price update on Base.</b> A Chainlink-style feed emits <code>AnswerUpdated</code>. <a href="https://base-sepolia.blockscout.com/tx/0xcc5ebe8ede44b64540f1d8fe3e235bd586d75f7d5f56d818905ec985648e914a" target="_blank" rel="noopener">0xcc5e…914a</a></li>
+            <li><b>2. Lasna checks the trigger.</b> ShieldReactive re-prices the loans near the new price and asks for a rescue for each one under its trigger, or about to be. <a href="https://lasna.reactscan.net/tx/0xcb9a55589ded5f6b33f7ba1da4a13171aa26afb1eb5c89963e5ab294e169c72a" target="_blank" rel="noopener">0xcb9a…c72a</a></li>
+            <li><b>3. The Base shield re-checks the live loan</b> before it spends anything, then repays USDC or supplies WETH by the smallest amount that reaches the target. <a href="https://base-sepolia.blockscout.com/tx/0x7686f5e3f0c7ea9408346825c5c9f925987fc9555906e4fc9c3d06dace4c6933" target="_blank" rel="noopener">0x7686…6933</a></li>
+            <li><b>4. The updated position goes back to Lasna</b> in the same transaction's <code>PositionSnapshot</code>, so the watcher's copy is current again.</li>
           </ol>
           <p class="muted">Separately, a periodic sweep on Reactive's <code>Cron10000</code>, about every 3 hours, re-checks loans a price update missed and refreshes day-old copies. Rescues take seconds because they come from price updates, not from the sweep.</p>
         </div>
@@ -430,7 +430,7 @@
       <div class="grid">
         <div class="span-6 stack-4">
           <p class="t-label sim__tag">Historical simulation · 24 loan scenarios · not measured on testnet</p>
-          <h2 id="sim-h">Why not just repay upfront?</h2>
+          <h2 id="sim-h">Rebound against repaying upfront</h2>
           <p>We replayed real Chainlink ETH/USD updates from four crashes (May 2021, August 2024, October 2025, February 2026) against identical loans with the same reserve, 20% of the debt, under three strategies.</p>
           <p>In these scenarios Rebound matched upfront repayment's liquidation count, cost $268 more in total, and left $17,724 of the reserves unspent. It was never late, even with a 300 s delay.</p>
           <a class="link" href="https://github.com/Om-Thanage/Rebound/blob/main/results/sim/summary.md" target="_blank" rel="noopener">Assumptions and every scenario</a>
@@ -444,6 +444,15 @@
                 <tr><th scope="row">No intervention</th><td>26</td><td>$9,379</td><td>$94,897</td></tr>
                 <tr><th scope="row">Repay upfront</th><td>7</td><td>$2,886</td><td>$0</td></tr>
                 <tr class="simt__us"><th scope="row">Rebound</th><td>7</td><td>$3,154</td><td>$17,724</td></tr>
+              </tbody>
+            </table>
+            <span class="pos__note">Liquidations in each crash: no intervention, upfront, Rebound</span>
+            <table class="simt simt--crash">
+              <tbody>
+                <tr><th scope="row">May 2021</th><td>13</td><td>5</td><td>5</td></tr>
+                <tr><th scope="row">August 2024</th><td>3</td><td>0</td><td>0</td></tr>
+                <tr><th scope="row">October 2025</th><td>1</td><td>0</td><td>0</td></tr>
+                <tr><th scope="row">February 2026</th><td>9</td><td>2</td><td>2</td></tr>
               </tbody>
             </table>
             <p class="pos__note">Cost is the liquidation bonus lost, fees and interest. The 7 left in both strategies had a reserve too small for a 39% fall. Simplified: fees come out of the same USDC reserve here; the deployed shield takes them from a WETH reserve.</p>

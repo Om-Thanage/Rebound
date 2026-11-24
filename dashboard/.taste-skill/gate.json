@@ -1,43 +1,35 @@
 {
- "start": "2026-11-21T17:00:38.471Z",
+ "start": "2026-11-24T20:08:09.871Z",
  "round": 3,
  "idle": 0,
  "errors": 0,
  "status": "open",
  "history": [
   {
-   "at": "2026-11-21T17:18:12.386Z",
+   "at": "2026-11-24T20:10:20.067Z",
    "mode": "manual",
    "status": "fail",
-   "fails": 19,
+   "fails": 24,
    "round": 1,
    "reused": false,
    "stopHookActive": false
   },
   {
-   "at": "2026-11-21T17:21:02.926Z",
+   "at": "2026-11-24T20:13:47.451Z",
    "mode": "manual",
    "status": "fail",
-   "fails": 4,
+   "fails": 10,
    "round": 2,
    "reused": false,
    "stopHookActive": false
   },
   {
-   "at": "2026-11-21T17:23:45.234Z",
+   "at": "2026-11-24T20:17:21.665Z",
    "mode": "manual",
    "status": "open",
-   "fails": 1,
+   "fails": 5,
    "round": 3,
    "reused": false,
-   "stopHookActive": false
-  },
-  {
-   "at": "2026-11-21T17:25:29.580Z",
-   "mode": "hook",
-   "host": "claude",
-   "decision": "allow",
-   "reason": "no build is active here",
    "stopHookActive": false
   }
  ],
@@ -47,57 +39,58 @@
   "url": null,
   "root": null,
   "kind": "software",
-  "category": "liquidation shield for Aave-style loans",
-  "primary": "Open the live dashboard",
+  "category": "liquidation protection for Aave-style loans",
+  "primary": "Run a testnet rescue",
   "rounds": 3,
-  "start": "2026-11-21T17:00:38.471Z",
+  "start": "2026-11-24T20:08:09.871Z",
   "by": "gate.mjs --start"
  },
  "manual": true,
- "roundKey": "0accb743f756be3d:9ba6fd8d",
+ "roundKey": "a1b91e157dfee806:10a60f34",
  "roundFree": false,
  "idleFree": false,
  "blockKey": null,
- "fp": "0accb743f756be3d",
+ "fp": "a1b91e157dfee806",
  "page": "index.html",
  "found": {
   "fails": [
    {
-    "check": "button-styles",
-    "where": "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\"",
-    "msg": "one button style (soft, fill #232323) in 2 heights: 44, 64px (\"See the live shield\" 64px, \"See the live shield\" 44px)",
-    "fix": "one primary and one secondary button: one shape, one height per size, one label size",
+    "check": "scroll-reveal",
+    "where": "div.grid > div.span-6.start-7 > div.panel > div.dg \"Price update Checks trigger Re-checks lo\"",
+    "msg": "starts \"border-bottom-color\" (0.9 s) the moment it is scrolled into view (an IntersectionObserver) on div.dg-node.dg-node--pill:nth-of-type(2)",
+    "fix": "show it at rest: no fade, rise or unmask when it is scrolled into view",
     "widths": [
      1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "scroll-reveal"
+    ],
+    "wheres": [
+     "div.grid > div.span-6.start-7 > div.panel > div.dg \"Price update Checks trigger Re-checks lo\""
+    ]
+   },
+   {
+    "check": "button-styles",
+    "where": "div.hero-text.grid > div.span-5 > div.hero__cta.hero__cta--left > a.btn.btn--primary \"Run a testnet rescue\"",
+    "msg": "one button style (soft, fill #232323) in 2 heights: 44, 64px (\"Run a testnet rescue\" 64px, \"Run a rescue\" 44px)",
+    "fix": "one primary and one secondary button: one shape, one height per size, one label size",
+    "widths": [
+     1440,
+     390
     ],
     "from": "consistency",
     "ids": [
      "button-styles"
     ],
     "wheres": [
-     "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\""
-    ]
-   },
-   {
-    "check": "same-action",
-    "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\"",
-    "msg": "\"See the live shield\" appears 3 times in different looks: 44px and 64px tall, labels at 16px and 20px",
-    "fix": "draw one action the same way everywhere (only the nav copy may be one size smaller)",
-    "widths": [
-     1440
-    ],
-    "from": "consistency",
-    "ids": [
-     "same-action"
-    ],
-    "wheres": [
-     "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\""
+     "div.hero-text.grid > div.span-5 > div.hero__cta.hero__cta--left > a.btn.btn--primary \"Run a testnet rescue\""
     ]
    },
    {
     "check": "off-grid",
-    "where": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\"",
-    "msg": "left edge at 103.5px, 23.5px off the page margin at 80px (23 elements, like span.mark.mark--initial)",
+    "where": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"R Rebound\"",
+    "msg": "left edge at 103.5px, 23.5px off the page margin at 80px (38 elements, like span.mark.mark--initial)",
     "fix": "move it onto the page margin, or the column edge its section uses",
     "widths": [
      1440,
@@ -108,55 +101,91 @@
      "off-grid"
     ],
     "wheres": [
-     "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\""
+     "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"R Rebound\""
     ]
    },
    {
-    "check": "section-air",
-    "where": "section#speed / section#fees",
-    "msg": "637px of air between the content of these two sections: 128-480px (64-600px WARN) (SR-3)",
-    "fix": "keep 128-480px of air between the content of neighbouring sections (112-420px on a phone): the sections' padding (--padt, --padb)",
+    "check": "section-height",
+    "where": "footer#contact \"Crash the price and watch the rescueOne \"",
+    "msg": "the section is 625px tall (0.7 screens), 275px short of one screen (900px): every section after the hero is one screen or two, 2px either way (SR-2)",
+    "fix": "set the section to one screen or two (height: calc(var(--h,1) * 100vh), --h 1 or 2) and cut or split its content to fit",
     "widths": [
      1440
     ],
     "from": "consistency",
     "ids": [
-     "section-air"
+     "section-height"
     ],
     "wheres": [
-     "section#speed / section#fees"
+     "footer#contact \"Crash the price and watch the rescueOne \""
     ]
    },
    {
-    "check": "cut-text",
-    "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
-    "msg": "runs past the edge of its box div.panel > div.dg > div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
-    "fix": "give the text room: no overflow clipping a line, no line past its box",
+    "check": "section-height",
+    "where": "section#fee-line \"A Rebound rescue, with its receipt The d\"",
+    "msg": "the section's content does not fit it: its content is 11px taller than the section (scrollHeight 911, clientHeight 900); its lowest content ends 908px below its top, past 828px (the section less 72px of bottom padding); 1 part lies outside the section's box (SR-2)",
+    "fix": "fit the content above the section's bottom padding (--padb), or make it two screens (.g2) in two groups",
     "widths": [
+     1440
+    ],
+    "from": "consistency",
+    "ids": [
+     "section-height"
+    ],
+    "wheres": [
+     "section#fee-line \"A Rebound rescue, with its receipt The d\"",
+     "section#fee-line > div.wrap > p.receipt__note.muted \"The fee is 0.3% of what a rescue moves, \""
+    ]
+   },
+   {
+    "check": "one-section",
+    "where": "section#fees \"Rebound's fees pay its callback gas Ever\"",
+    "msg": "the screen at scroll 6925px (the top of section 8) shows 203px of section 7 beside section 8: a screen shows one section (another may peek 8px, 24px WARN) (SR-4)",
+    "fix": "make each section exactly one screen or two, so a screen shows one section and no neighbour peeks",
+    "widths": [
+     1440,
      390
     ],
     "from": "consistency",
     "ids": [
-     "cut-text"
+     "one-section",
+     "neighbour"
     ],
     "wheres": [
-     "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+     "section#fees \"Rebound's fees pay its callback gas Ever\"",
+     "#fees section.section.ground-surface \"Rebound's fees pay its callback \""
     ]
    },
    {
-    "check": "contrast",
-    "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
-    "msg": "body text over a effect reads at 3.7:1 at its worst tenth (needs 4.5:1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
-    "fix": "put the text on a calm part of the picture, or on a solid panel",
+    "check": "split-pair",
+    "where": "main#top > section.hero.hero--triptych > div.wrap > div.hero-text.grid \"Rescue your loan before liquidation Set \"",
+    "msg": "the two columns of the split start 43px apart at the top: a split's columns are top-aligned, 8px either way (SR-8)",
+    "fix": "top-align both columns of the split (align-items: start)",
     "widths": [
-     390
+     1440
     ],
     "from": "consistency",
     "ids": [
-     "contrast"
+     "split-pair"
     ],
     "wheres": [
-     "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+     "main#top > section.hero.hero--triptych > div.wrap > div.hero-text.grid \"Rescue your loan before liquidation Set \""
+    ]
+   },
+   {
+    "check": "sparse",
+    "where": "#live section.section \"A demo loan you can crashA small\"",
+    "msg": "its content fills 48% of its screen; merge it or give it its visual (0.55 is the aim)",
+    "fix": "fill the section or make it a screen shorter",
+    "widths": [
+     1440
+    ],
+    "from": "layout",
+    "ids": [
+     "sparse"
+    ],
+    "wheres": [
+     "#live section.section \"A demo loan you can crashA small\""
     ]
    }
   ],
@@ -164,7 +193,7 @@
    {
     "check": "assets",
     "where": "(the page)",
-    "msg": "the data file data/bench.json did not load (404)",
+    "msg": "the data file https://base-sepolia.blockscout.com/api?module=logs&action=getLogs&address=0x151c43a482687C07F603E85714F333EaA8eEd7f2&topic0=0x28b6c2526f0d05eac057487199a229c2584389d09c1a5b014dcf02610fdd8419&fromBlock=63122585&toBlock=63147238&page=1&offset=1000 did not load (429)",
     "fix": "fix the path, or remove the reference",
     "widths": [
      1440
@@ -173,7 +202,7 @@
    },
    {
     "check": "nav",
-    "where": "header.nav > div.wrap.nav__bar > a.nav__logo \"P Parapet\"",
+    "where": "header.nav > div.wrap.nav__bar > a.nav__logo \"R Rebound\"",
     "msg": "the nav is lopsided: its first item starts 7px inside the content's edge (80px), while its last ends on the other edge",
     "fix": "start the nav's first item and end its last on the content's two edges",
     "widths": [
@@ -182,9 +211,29 @@
     "from": "consistency"
    },
    {
+    "check": "copy-buttons",
+    "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"Run a rescue\"",
+    "msg": "\"Run a rescue\" does not start with a verb (book, buy, try, start, get, see...) (and 1 more like it: \"Run a testnet rescue\")",
+    "fix": "label buttons with a verb and what the visitor gets (\"Book a room\", \"Start free trial\")",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "copy-actions",
+    "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"Run a rescue\"",
+    "msg": "2 labels for one target /index.html#live: \"Run a rescue\", \"Run a testnet rescue\"",
+    "fix": "few actions, one wording: at most 2 in the hero, the main action word for word in nav, hero and close",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
     "check": "copy-actions",
     "where": "(the page)",
-    "msg": "the main action \"Open the live dashboard\" does not read word for word the same in the nav or hero and the closing section",
+    "msg": "the main action \"Run a testnet rescue\" does not read word for word the same in the closing section",
     "fix": "few actions, one wording: at most 2 in the hero, the main action word for word in nav, hero and close",
     "widths": [
      1440
@@ -193,8 +242,8 @@
    },
    {
     "check": "text-contrast",
-    "where": "div.ui-win__main > ul.ui-win__rows > li.ui-win__row:nth-of-type(1) > span.ui-win__st \"Rescued\"",
-    "msg": "12 lines of text in drawn mocks read under 4.5:1 (1 colour pair), the worst \"Rescued\" in #848484 on #ffffff at 3.74:1",
+    "where": "div.ui.ui-panel > div.ui-win__body > nav.ui-win__side > span.ui-win__label:nth-of-type(1) \"Show\"",
+    "msg": "9 lines of text in drawn mocks read under 4.5:1 (1 colour pair), the worst \"Show\" in #848484 on #ffffff at 3.74:1",
     "fix": "lift the mocks' muted text (labels, meta, initials) to 4.5:1 on their own panel, or set it larger",
     "widths": [
      1440
@@ -204,7 +253,7 @@
    {
     "check": "section-gaps",
     "where": "main#top > section.hero.hero--triptych / section#live",
-    "msg": "222px between these sections, -26% against the median 300px",
+    "msg": "222px between these sections, -26% against the median 299px",
     "fix": "use one gap between sections (all within 25% of each other)",
     "widths": [
      1440
@@ -212,20 +261,19 @@
     "from": "consistency"
    },
    {
-    "check": "section-gaps",
-    "where": "section#speed / section#fees",
-    "msg": "uneven space at the edge of a band: 117px outside its edge, 220px inside it (the space on either side of a change of ground reads as one gap only when the two match)",
-    "fix": "use one gap between sections (all within 25% of each other)",
+    "check": "links",
+    "where": "div.grid > div.span-5.stack-4 > div > a.btn.btn--primary \"Run a rescue\"",
+    "msg": "\"Run a rescue\" goes to #live, the block it already sits in",
+    "fix": "point every link at a real section, page or file",
     "widths": [
-     1440,
-     390
+     1440
     ],
     "from": "consistency"
    },
    {
     "check": "nav-labels",
-    "where": "header.nav > div.wrap.nav__bar > a.nav__logo \"P Parapet\"",
-    "msg": "\"P Parapet\" opens a section headed \"Liquidation shield for Aave loans\"",
+    "where": "header.nav > div.wrap.nav__bar > a.nav__logo \"R Rebound\"",
+    "msg": "\"R Rebound\" opens a section headed \"Rescue your loan before liquidation\"",
     "fix": "name each nav link after the heading of the section it opens",
     "widths": [
      1440
@@ -235,7 +283,37 @@
    {
     "check": "nav-labels",
     "where": "div.wrap.nav__bar > nav.nav__links > div.nav__item:nth-of-type(1) > a.nav__link \"Product\"",
-    "msg": "\"Product\" opens a section headed \"Parapet's rescue loop, from price event to callbac\"",
+    "msg": "\"Product\" opens a section headed \"Rebound's rescue loop, from price event to callbac\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "div.nav__menu > div.wrap.grid > div.menu-col.span-3:nth-of-type(1) > a:nth-of-type(1) \"Live loanHealth factor, reserve, price\"",
+    "msg": "\"Live loanHealth factor, reserve, price\" opens a section headed \"A demo loan you can crash\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "div.nav__menu > div.wrap.grid > div.menu-col.span-3:nth-of-type(2) > a:nth-of-type(3) \"SimulationFour historical crashes\"",
+    "msg": "\"SimulationFour historical crashes\" opens a section headed \"Rebound against repaying upfront\"",
+    "fix": "name each nav link after the heading of the section it opens",
+    "widths": [
+     1440
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "nav-labels",
+    "where": "div.wrap.nav__bar > nav.nav__links > div.nav__item:nth-of-type(2) > a.nav__link \"Live\"",
+    "msg": "\"Live\" opens a section headed \"A demo loan you can crash\"",
     "fix": "name each nav link after the heading of the section it opens",
     "widths": [
      1440
@@ -245,7 +323,7 @@
    {
     "check": "nav-labels",
     "where": "div.wrap.nav__bar > nav.nav__links > div.nav__item:nth-of-type(3) > a.nav__link \"Speed\"",
-    "msg": "\"Speed\" opens a section headed \"Parapet's rescue latency, measured on testnets\"",
+    "msg": "\"Speed\" opens a section headed \"Rebound's rescue latency, measured on testnets\"",
     "fix": "name each nav link after the heading of the section it opens",
     "widths": [
      1440
@@ -253,13 +331,12 @@
     "from": "consistency"
    },
    {
-    "check": "stranded-action",
-    "where": "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\"",
-    "msg": "stands 750px across from the nearest text of its block (\"Liquidation shield for Aave lo\")",
-    "fix": "put the button under or beside the text it belongs to",
+    "check": "copy-length",
+    "where": "section#how \"Rebound's rescue loop, from price event \"",
+    "msg": "4 sections over 90 words a screen outside the UI mocks (\"Rebound's rescue loop, f\" 164, \"A Rebound rescue, with i\" 125, \"A demo loan you can cras\" 103); 95 words a screen across the page (761 words in 8 screens): a tech page says it in about 80 or fewer",
+    "fix": "cut every section to its heading, one line and the product UI: the UI says the rest; no second paragraph, no list of feature sentences",
     "widths": [
-     1440,
-     390
+     1440
     ],
     "from": "consistency"
    },
@@ -274,12 +351,23 @@
     "from": "consistency"
    },
    {
-    "check": "action-repeat",
-    "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"see the live shield\"",
-    "msg": "\"see the live shield\" shows 2 times on the first screen at 1440px (nav, hero): the nav's button and the hero's; nothing else on the screen may repeat it",
-    "fix": "show the action once a screen besides the nav's button: the hero's, the close's or the phone bar's, never all at once",
+    "check": "button-contrast",
+    "where": "div.hero-text.grid > div.span-5 > div.hero__cta.hero__cta--left > a.btn.btn--secondary \"Watch a recorded rescue\"",
+    "msg": "the button \"Watch a recorded rescue\" (#ebebeb) stands only 1.19:1 off the ground around it: it reads as part of the ground, or as switched off",
+    "fix": "give the button a fill that stands at least 1.5:1 off what is around it, or an outline in the ink",
     "widths": [
-     1440
+     1440,
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "button-styles",
+    "where": "div.grid > div.span-5.stack-4 > div > a.btn.btn--primary \"Run a rescue\"",
+    "msg": "on the phone 3 buttons run the full width of their column, but 3 keep their own width, like \"Run a rescue\" is 142px of 342px: one action in two sizes",
+    "fix": "give every button the same width rule on the phone: all full width, or all at their own width",
+    "widths": [
+     390
     ],
     "from": "consistency"
    },
@@ -295,9 +383,29 @@
    },
    {
     "check": "section-gaps",
-    "where": "section#fees / footer#contact",
+    "where": "section#speed / section#sim",
+    "msg": "uneven space at the edge of a band: 97px outside its edge, 48px inside it (the space on either side of a change of ground reads as one gap only when the two match)",
+    "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "section-gaps",
+    "where": "section#sim / section#fees",
     "msg": "uneven space at the edge of a band: 48px outside its edge, 94px inside it (the space on either side of a change of ground reads as one gap only when the two match)",
     "fix": "use one gap between sections (all within 25% of each other)",
+    "widths": [
+     390
+    ],
+    "from": "consistency"
+   },
+   {
+    "check": "orphan",
+    "where": "section#live > div.wrap > ol.steps > li:nth-of-type(3) \"3 Price falls fast Health factor 1.20, 1\"",
+    "msg": "its last line holds only \"1.15\"",
+    "fix": "rebalance the text (text-wrap: pretty, or a shorter line) so the last line holds more than one short word",
     "widths": [
      390
     ],
@@ -306,67 +414,119 @@
   ],
   "crashed": [],
   "seconds": {
-   "consistency": 101,
-   "layout": 6
+   "consistency": 123,
+   "layout": 5
   }
  },
  "open": [
   {
-   "check": "section-air",
-   "where": "section#speed / section#fees",
-   "msg": "637px of air between the content of these two sections: 128-480px (64-600px WARN) (SR-3)",
-   "fix": "keep 128-480px of air between the content of neighbouring sections (112-420px on a phone): the sections' padding (--padt, --padb)",
+   "check": "scroll-reveal",
+   "where": "div.grid > div.span-6.start-7 > div.panel > div.dg \"Price update Checks trigger Re-checks lo\"",
+   "msg": "starts \"border-bottom-color\" (0.9 s) the moment it is scrolled into view (an IntersectionObserver) on div.dg-node.dg-node--pill:nth-of-type(2)",
+   "fix": "show it at rest: no fade, rise or unmask when it is scrolled into view",
    "widths": [
     1440
    ],
    "from": "consistency",
    "ids": [
-    "section-air"
+    "scroll-reveal"
    ],
    "wheres": [
-    "section#speed / section#fees"
+    "div.grid > div.span-6.start-7 > div.panel > div.dg \"Price update Checks trigger Re-checks lo\""
+   ]
+  },
+  {
+   "check": "section-height",
+   "where": "section#fee-line \"A Rebound rescue, with its receipt The d\"",
+   "msg": "the section's content does not fit it: its content is 11px taller than the section (scrollHeight 911, clientHeight 900); its lowest content ends 908px below its top, past 828px (the section less 72px of bottom padding); 1 part lies outside the section's box (SR-2)",
+   "fix": "fit the content above the section's bottom padding (--padb), or make it two screens (.g2) in two groups",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "section-height"
+   ],
+   "wheres": [
+    "section#fee-line \"A Rebound rescue, with its receipt The d\"",
+    "section#fee-line > div.wrap > p.receipt__note.muted \"The fee is 0.3% of what a rescue moves, \""
+   ]
+  },
+  {
+   "check": "one-section",
+   "where": "section#fees \"Rebound's fees pay its callback gas Ever\"",
+   "msg": "the screen at scroll 6925px (the top of section 8) shows 203px of section 7 beside section 8: a screen shows one section (another may peek 8px, 24px WARN) (SR-4)",
+   "fix": "make each section exactly one screen or two, so a screen shows one section and no neighbour peeks",
+   "widths": [
+    1440,
+    390
+   ],
+   "from": "consistency",
+   "ids": [
+    "one-section",
+    "neighbour"
+   ],
+   "wheres": [
+    "section#fees \"Rebound's fees pay its callback gas Ever\"",
+    "#fees section.section.ground-surface \"Rebound's fees pay its callback \""
+   ]
+  },
+  {
+   "check": "split-pair",
+   "where": "main#top > section.hero.hero--triptych > div.wrap > div.hero-text.grid \"Rescue your loan before liquidation Set \"",
+   "msg": "the two columns of the split start 43px apart at the top: a split's columns are top-aligned, 8px either way (SR-8)",
+   "fix": "top-align both columns of the split (align-items: start)",
+   "widths": [
+    1440
+   ],
+   "from": "consistency",
+   "ids": [
+    "split-pair"
+   ],
+   "wheres": [
+    "main#top > section.hero.hero--triptych > div.wrap > div.hero-text.grid \"Rescue your loan before liquidation Set \""
+   ]
+  },
+  {
+   "check": "sparse",
+   "where": "#live section.section \"A demo loan you can crashA small\"",
+   "msg": "its content fills 48% of its screen; merge it or give it its visual (0.55 is the aim)",
+   "fix": "fill the section or make it a screen shorter",
+   "widths": [
+    1440
+   ],
+   "from": "layout",
+   "ids": [
+    "sparse"
+   ],
+   "wheres": [
+    "#live section.section \"A demo loan you can crashA small\""
    ]
   }
  ],
  "waived": [
   {
    "check": "button-styles",
-   "where": "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\"",
-   "msg": "one button style (soft, fill #232323) in 2 heights: 44, 64px (\"See the live shield\" 64px, \"See the live shield\" 44px)",
+   "where": "div.hero-text.grid > div.span-5 > div.hero__cta.hero__cta--left > a.btn.btn--primary \"Run a testnet rescue\"",
+   "msg": "one button style (soft, fill #232323) in 2 heights: 44, 64px (\"Run a testnet rescue\" 64px, \"Run a rescue\" 44px)",
    "fix": "one primary and one secondary button: one shape, one height per size, one label size",
    "widths": [
-    1440
+    1440,
+    390
    ],
    "from": "consistency",
    "ids": [
     "button-styles"
    ],
    "wheres": [
-    "div.wrap > div.hero-text.grid > div.span-3.start-10 > a.btn.btn--primary \"See the live shield\""
+    "div.hero-text.grid > div.span-5 > div.hero__cta.hero__cta--left > a.btn.btn--primary \"Run a testnet rescue\""
    ],
-   "reason": "The dealt triptych hero's own recipe (layout.css 9) sets its one large 64px button; the nav and close keep the standard height."
-  },
-  {
-   "check": "same-action",
-   "where": "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\"",
-   "msg": "\"See the live shield\" appears 3 times in different looks: 44px and 64px tall, labels at 16px and 20px",
-   "fix": "draw one action the same way everywhere (only the nav copy may be one size smaller)",
-   "widths": [
-    1440
-   ],
-   "from": "consistency",
-   "ids": [
-    "same-action"
-   ],
-   "wheres": [
-    "header.nav > div.wrap.nav__bar > div.nav__actions > a.btn.btn--primary \"See the live shield\""
-   ],
-   "reason": "Same cause: the triptych hero's large button is the kit's design, the action and its wording are identical everywhere."
+   "reason": "The dealt triptych hero's own recipe (layout.css) sets its large 64px buttons; the nav and close keep the standard 44px height."
   },
   {
    "check": "off-grid",
-   "where": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\"",
-   "msg": "left edge at 103.5px, 23.5px off the page margin at 80px (23 elements, like span.mark.mark--initial)",
+   "where": "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"R Rebound\"",
+   "msg": "left edge at 103.5px, 23.5px off the page margin at 80px (38 elements, like span.mark.mark--initial)",
    "fix": "move it onto the page margin, or the column edge its section uses",
    "widths": [
     1440,
@@ -377,46 +537,29 @@
     "off-grid"
    ],
    "wheres": [
-    "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"P Parapet\""
+    "div.closing__links > div.grid > div.span-6.stack-4 > a.nav__logo \"R Rebound\""
    ],
    "reason": "footer--statement is the kit's inset slab (system.css insets it and pads its content); the logo sits on that slab's own wrap."
   },
   {
-   "check": "cut-text",
-   "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
-   "msg": "runs past the edge of its box div.panel > div.dg > div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
-   "fix": "give the text room: no overflow clipping a line, no line past its box",
+   "check": "section-height",
+   "where": "footer#contact \"Crash the price and watch the rescueOne \"",
+   "msg": "the section is 625px tall (0.7 screens), 275px short of one screen (900px): every section after the hero is one screen or two, 2px either way (SR-2)",
+   "fix": "set the section to one screen or two (height: calc(var(--h,1) * 100vh), --h 1 or 2) and cut or split its content to fit",
    "widths": [
-    390
+    1440
    ],
    "from": "consistency",
    "ids": [
-    "cut-text"
+    "section-height"
    ],
    "wheres": [
-    "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
+    "footer#contact \"Crash the price and watch the rescueOne \""
    ],
-   "reason": "The kit's lanes diagram wraps short tile captions under each node at 390; the 390 screenshot shows every label whole."
-  },
-  {
-   "check": "contrast",
-   "where": "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\"",
-   "msg": "body text over a effect reads at 3.7:1 at its worst tenth (needs 4.5:1) (and 3 more like it: \"Loan A\", \"Loan B\", \"Loan C\")",
-   "fix": "put the text on a calm part of the picture, or on a solid panel",
-   "widths": [
-    390
-   ],
-   "from": "consistency",
-   "ids": [
-    "contrast"
-   ],
-   "wheres": [
-    "div.dg-nodes > div.dg-node.dg-node--tile:nth-of-type(1) > span.dg-cap > span.dg-cap__l \"Oracle\""
-   ],
-   "reason": "Captions sit on the kit's lit sky ground beside the node tiles; the screenshot reads clearly and the ground is the kit's own."
+   "reason": "The dealt footer-statement close has no wordmark and is the last block on the page, so it is sized to its content; no section follows it to start off the screen grid."
   }
  ],
- "warnCount": 14,
- "at": "2026-11-21T17:23:45.235Z",
+ "warnCount": 22,
+ "at": "2026-11-24T20:17:21.667Z",
  "openTold": true
 }
