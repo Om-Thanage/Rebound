@@ -441,6 +441,14 @@ contract ShieldTest is Test {
         assertEq(bal, 0);
     }
 
+    /// ETH forced in without receive() must not make the ledger revert (the dashboard reads it).
+    function test_opsLedgerSurvivesForcedEth() public {
+        vm.deal(address(shield), address(shield).balance + 1 ether); // what a selfdestruct would do
+        (,, uint256 gasPaid, uint256 bal,) = shield.opsLedger();
+        assertEq(gasPaid, 0);
+        assertEq(bal, address(shield).balance);
+    }
+
     function test_partialRescueWhenReserveIsShort() public {
         _protectAlice(0.05 ether);
         _movePrice(1600e8);
@@ -1082,10 +1090,13 @@ contract ShieldTest is Test {
         aggWeth.updateAnswer(1);
         vm.expectRevert(MockAggregator.NotAllowed.selector);
         aggLead.updateAnswer(1);
-        // the demo's price moves stay open, through the oracle
+        // prices too: every price event costs the reactive contract lREACT, so only the deployer and DemoLoan
+        vm.expectRevert(MockAaveOracle.NotOwner.selector);
         oracle.setAssetPrice(address(weth), 1999e8);
+        vm.expectRevert(MockAaveOracle.NotOwner.selector);
+        oracle.setDemo(bob);
         vm.stopPrank();
-        assertEq(oracle.getAssetPrice(address(weth)), 1999e8);
+        assertEq(oracle.getAssetPrice(address(weth)), 2000e8);
     }
 
     function test_setupPublishesOneSnapshot() public {
@@ -1140,8 +1151,10 @@ contract ShieldTest is Test {
     // ---- DemoLoan: the dashboard's one-click rescue
 
     function _deployDemo() internal returns (DemoLoan demo) {
+        oracle.setDemo(vm.computeCreateAddress(address(this), vm.getNonce(address(this))));
         vm.recordLogs();
         demo = new DemoLoan{value: 0.007 ether}(weth, usdc, oracle, pool, shield, 0.003 ether);
+        assertEq(oracle.demo(), address(demo));
         _relayAll();
     }
 

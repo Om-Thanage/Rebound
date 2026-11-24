@@ -325,7 +325,8 @@ contract LiquidationShield is AbstractCallback {
         fees = feesEarnedWei;
         externalFunding = externalFundingWei;
         balance = address(this).balance;
-        gasPaid = fees + externalFunding - balance;
+        // ETH forced in without receive() (selfdestruct) can push the balance above what came in; never revert
+        gasPaid = fees + externalFunding > balance ? fees + externalFunding - balance : 0;
         debt = _SERVICE_PROVIDER.debt(address(this));
     }
 

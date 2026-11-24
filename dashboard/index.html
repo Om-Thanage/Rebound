@@ -310,8 +310,8 @@
                 <button type="button" class="ui-win__nav" data-filter="bench" aria-pressed="false"><span class="ui-win__hash">B</span>Benchmark<em data-live="count-bench">…</em></button>
                 <button type="button" class="ui-win__nav" data-filter="other" aria-pressed="false"><span class="ui-win__hash">L</span>Other loans<em data-live="count-other">…</em></button>
                 <span class="ui-win__label">Contracts</span>
-                <a class="ui-win__nav" data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc" target="_blank" rel="noopener">Shield, Base ↗</a>
-                <a class="ui-win__nav" data-live-href="reactive" href="https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345" target="_blank" rel="noopener">Reactive, Lasna ↗</a>
+                <a class="ui-win__nav" data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0xd9394D6847f0269C0485853AEc506450C1bB4ca0" target="_blank" rel="noopener">Shield, Base ↗</a>
+                <a class="ui-win__nav" data-live-href="reactive" href="https://lasna.reactscan.net/address/0xDF7afB41ba5C15aE5d3F7A3FA44F352CDc2D3984" target="_blank" rel="noopener">Reactive, Lasna ↗</a>
                 <span class="ui-win__label tip tip--up" tabindex="0" data-live="loans" data-tip="Loans ShieldReactive re-checks on every price update">Watching 2 loans</span>
                 <span class="ui-win__label" data-live="coverage"></span>
               </nav>
@@ -403,7 +403,7 @@
           <h2 id="fees-h">Rebound's fees pay its callback gas</h2>
           <p>Every fee is unwrapped to ETH inside the shield, and the callback proxy takes its gas from that balance. A small daily watch fee covers loans that are watched but never rescued. Execution on Lasna is paid in lREACT, funded by hand on testnet; the panel shows how much work it does.</p>
           <p>Everything runs on Base Sepolia and Reactive Lasna testnets with test tokens. The pool copies Aave V3's function names and health factor maths so the demo can move the price.</p>
-          <a class="link" href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc">Open the shield on Blockscout</a>
+          <a class="link" data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0xd9394D6847f0269C0485853AEc506450C1bB4ca0">Open the shield on Blockscout</a>
         </div>
         <div class="span-6 start-7">
           <div class="panel"><div class="ui ui-panel ledger">
@@ -446,7 +446,7 @@
         </div>
         <div class="span-2 footer__col"><h3>Shield</h3><ul><li><a href="#live">Live</a></li><li><a href="#how">Loop</a></li></ul></div>
         <div class="span-2 footer__col"><h3>Proof</h3><ul><li><a href="#speed">Speed</a></li><li><a href="#fees">Fees</a></li></ul></div>
-        <div class="span-2 footer__col"><h3>Chains</h3><ul><li><a href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc">Base Sepolia</a></li><li><a href="https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345">Reactive Lasna</a></li></ul></div>
+        <div class="span-2 footer__col"><h3>Chains</h3><ul><li><a data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0xd9394D6847f0269C0485853AEc506450C1bB4ca0">Base Sepolia</a></li><li><a data-live-href="reactive" href="https://lasna.reactscan.net/address/0xDF7afB41ba5C15aE5d3F7A3FA44F352CDc2D3984">Reactive Lasna</a></li></ul></div>
       </div>
       <div class="footer__legal">
         <span>&copy; 2026 Rebound</span>

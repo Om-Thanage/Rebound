@@ -307,7 +307,7 @@ Sepolia ETH (for the lead feed), and Lasna lREACT (send Sepolia ETH to the fauce
 
 ```bash
 cp .env.example .env              # then put your testnet PRIVATE_KEY in .env (or point ENV_FILE at another file)
-forge test                        # 55 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
+forge test                        # 56 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
 bash script/deploy.sh             # predicts every address, deploys lead feed, Lasna, then Base; writes deployments.env
 bash script/status.sh             # health check: lREACT runway in demo runs, CRON firing, ledger, demo loan
 node script/export-deployment.mjs # points the dashboard at the new deployment
@@ -344,28 +344,32 @@ for new blocks; if Blockscout fails, it reads up to a day over RPC and says whic
 | `src/ShieldReactive.sol` | reactive contract: mirrors loans, buckets, early and lead-feed requests, aggregator following, CRON |
 | `src/DemoLoan.sol` | a protected loan anyone can reset and crash in two steps, in either mode |
 | `src/mocks/` | lending pool with Aave V3's signatures and maths (two collateral assets), Chainlink-style feeds, test tokens |
-| `test/Shield.t.sol` | 55 tests with a mocked system contract and callback proxy |
+| `test/Shield.t.sol` | 56 tests with a mocked system contract and callback proxy |
 | `script/` | deploy, demo, lead feed, benchmark, exports |
 | `dashboard/` | the live page |
 
 ## Fixes after v4 (in the code, not yet deployed)
 
-An outside review of `f38a97a` found five problems. All five are fixed here with a test each (55 tests). The
-dashboard fix is live; the contract fixes take effect at the next deploy, so the deployed v4 still has them.
+An outside review of `f38a97a` found five problems, and a follow-up audit found four more. All are fixed here with a test each (56 tests).
+The dashboard fixes are live; the contract fixes take effect at the next deploy, so the deployed v4 still has them.
 
 | Problem | Fix | Live? |
 |---|---|---|
 | A partial rescue charged the 0.3% fee on the full top-up the loan needed, not on what the reserve could supply (0.003 WETH on a 0.007 WETH top-up) | The top-up and its fee are sized together, so the fee is 0.3% of what moves (or the 0.0001 ETH floor) | Next deploy |
 | The snapshot counted every aToken balance as collateral; Aave leaves out assets the borrower switched off and applies eMode thresholds, so the mirror could think a loan was safer than it is | Thresholds in the snapshot are scaled so the mirror's health factor matches the pool's own `getUserAccountData` | Next deploy |
 | An early request from a falling WBTC price sent a WBTC price as the hint, which the shield reads as a WETH price, so the rescue was skipped | Early requests come only from WETH moves; WBTC loans are rescued when they cross the trigger | Next deploy |
-| A tick that ran out of gas in a crowded bucket restarted at the front of that bucket, so later loans waited for the sweep | The scan remembers its place inside the bucket | Next deploy |
+| A tick that ran out of gas in a crowded bucket restarted at the front of that bucket, so later loans waited for the sweep | The scan remembers its place inside the bucket, and steps back when a landed rescue moves an unchecked loan behind it | Next deploy |
 | The dashboard said "safe again" after every rescue, even a partial one | It reads the health factor after the rescue: at target, above the trigger, under the trigger, or under 1.0 | Live |
+| Anyone could call the mock oracle's `setAssetPrice` in a loop, and every price event costs the reactive contract lREACT, so one person could switch the demo off | Only the deployer and `DemoLoan` (one run a minute) may move prices | Next deploy |
+| ETH forced into the shield without `receive()` made `opsLedger()` underflow and revert, breaking the dashboard's fee panel | Gas paid floors at 0 | Next deploy |
+| The dashboard kept polling public RPCs from hidden tabs, and fell back to an old deployment's addresses if `deployment.json` failed to load | Hidden tabs skip the 10-second refresh; no fallback addresses, and the page says when live data is unavailable | Live |
 
 ## Limits
 
 - The pool is a mock with Aave V3's interface, because Aave's testnet oracle price can't be moved for a demo.
-  Anyone may move the test price through the mock oracle (the demo depends on it); everything else on the mocks
-  (swapping a feed's aggregator, oracle sources, listing collateral, the borrow rate) is the deployer's alone.
+  In the code, only the deployer and `DemoLoan` may move the test price (the deployed v4 still lets anyone);
+  everything else on the mocks (swapping a feed's aggregator, oracle sources, listing collateral, the borrow rate)
+  is the deployer's alone.
 - Collateral top-ups and fees are in WETH. Other collateral assets are watched and priced, but a rescue tops up
   with WETH.
 - The price hint (projected or lead price) is trusted up to 5% under the oracle. A manipulated lead feed can make

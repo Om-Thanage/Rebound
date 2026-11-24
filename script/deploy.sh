@@ -71,7 +71,7 @@ check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockWETH)" "$WETH"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockERC20 --constructor-args "Test USD Coin" tUSDC 6)" "$USDC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockERC20 --constructor-args "Test Wrapped BTC" tWBTC 8)" "$WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAaveOracle.sol:MockAaveOracle)" "$ORACLE"
-# the oracle (predicted above) is the one updater allowed besides the deployer: its setAssetPrice is the demo's open door
+# the oracle (predicted above) is the one updater allowed besides the deployer; it lets only the deployer and DemoLoan move prices
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator --constructor-args "$ORACLE")" "$AGG_WETH"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregator --constructor-args "$ORACLE")" "$AGG_WBTC"
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockAggregator.sol:MockAggregatorProxy --constructor-args "$AGG_WETH")" "$PROXY_WETH"
@@ -90,8 +90,12 @@ send "$ORACLE" "setAssetPrice(address,uint256)" "$WETH" 200000000000
 send "$ORACLE" "setAssetPrice(address,uint256)" "$WBTC" 6000000000000
 echo "Prices set: WETH \$2,000, WBTC \$60,000."
 
+# only the deployer and DemoLoan may move prices (each price event costs the reactive contract lREACT)
+DEMO_PREDICTED=$(addr "$DEPLOYER" $(($(cast nonce "$DEPLOYER" --rpc-url "$BASE_SEPOLIA_RPC") + 1)))
+send "$ORACLE" "setDemo(address)" "$DEMO_PREDICTED"
 DEMO=$(create "$BASE_SEPOLIA_RPC" src/DemoLoan.sol:DemoLoan --value "$((4000000000000000 + DEMO_RESERVE))" \
   --constructor-args "$WETH" "$USDC" "$ORACLE" "$POOL" "$SHIELD" "$DEMO_RESERVE")
+check "$DEMO" "$DEMO_PREDICTED"
 echo "DemoLoan: $DEMO"
 
 cat > deployments.env <<EOF

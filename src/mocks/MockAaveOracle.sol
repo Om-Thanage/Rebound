@@ -8,6 +8,7 @@ import {MockAggregator, MockAggregatorProxy} from "./MockAggregator.sol";
 /// and the price event comes from the aggregator (`AnswerUpdated`), as it would on mainnet.
 contract MockAaveOracle {
     address public immutable owner;
+    address public demo; // the DemoLoan, the one other caller allowed to move prices
     mapping(address => MockAggregatorProxy) public sources;
 
     event AssetSourceUpdated(address indexed asset, address indexed source);
@@ -32,8 +33,16 @@ contract MockAaveOracle {
         return answer > 0 ? uint256(answer) : 0;
     }
 
-    /// Testnet only: anyone may move a price (the dashboard's Run a rescue relies on it).
+    /// Deployer only: name the DemoLoan (its address is predicted before it is deployed). Set once.
+    function setDemo(address demo_) external {
+        if (msg.sender != owner || demo != address(0)) revert NotOwner();
+        demo = demo_;
+    }
+
+    /// Moves a test price. Only the deployer and the DemoLoan may: every price event costs the reactive contract
+    /// lREACT, so an open setter would let anyone drain it. DemoLoan.run() allows one run a minute.
     function setAssetPrice(address asset, uint256 price) external {
+        if (msg.sender != owner && msg.sender != demo) revert NotOwner();
         require(price > 0 && price <= uint256(type(int256).max), "bad price");
         MockAggregatorProxy s = sources[asset];
         require(address(s) != address(0), "no source");

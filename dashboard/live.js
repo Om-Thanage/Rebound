@@ -6,16 +6,10 @@ const SCOUT = 'https://base-sepolia.blockscout.com';
 let LASNA = 'https://lasna-rpc.rnk.dev/';
 const LASNA_SCAN = 'https://lasna.reactscan.net';
 const LOGS_RPC = 'https://base-sepolia-rpc.publicnode.com'; // wide eth_getLogs ranges, open CORS
-let REACTIVE = '0x49074f7961c01416cf5A57d13df664C32fb33345';
-// Addresses of the live deployment; data/deployment.json (written by script/export-deployment.mjs) overrides them.
-const A = {
-  user: '0x3673cE1229C43ac7A64a5E85DB58c1320d5E4573', // DemoLoan: the loan visitors crash with Run a rescue
-  weth: '0x8C2A82cC3A5f9d1736c3A5bE0Dd2Ef56e1c37A64',
-  oracle: '0xB567239e6AE5E9b76462dAE4610335e480263b03',
-  pool: '0x7ac6FcF13E42908F78A691B7CaF7Cb55BfD18774',
-  shield: '0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc',
-  deployer: '0x312D0201519E71A0A7704F7a349d35B129615fcD', // the benchmark loan (script/bench.sh)
-};
+let REACTIVE = '';
+// Addresses of the live deployment, from data/deployment.json (written by script/export-deployment.mjs). No
+// built-in fallback: stale addresses would show an old deployment as if it were live.
+const A = { user: '', weth: '', oracle: '', pool: '', shield: '', deployer: '' };
 const SYSTEM = '0x8888888888888888888888888888888888888888'; // Reactive system contract on Lasna
 const LREACT_PER_RUN = 0.111; // measured cost of one dashboard run on Lasna (README)
 const SEL = { account: '0xbf92857c', price: '0xb3596f07', prot: '0x613e3fc0', ledger: '0x30b7c49f', collateral: '0xa5fdc5de', debt: '0x9b6c56ec', count: '0x98e78023', run: '0xc0406226', wait: '0xccca123b',
@@ -334,11 +328,18 @@ async function readBench() {
 
 const safe = (f) => f().catch((e) => console.warn('live data:', e.message));
 loadDeployment().then(async () => {
+  if (!A.shield || !REACTIVE) {
+    status('Live data is unavailable: data/deployment.json did not load.');
+    return;
+  }
   safe(readBench);
   safe(readRescues);
   safe(readLoan);
   safe(readReactive);
-  setInterval(() => { safe(readLoan); safe(readRescues); safe(readReactive); }, 10_000);
+  setInterval(() => {
+    if (document.hidden) return; // a tab nobody is looking at shouldn't use up the public RPCs' rate limits
+    safe(readLoan); safe(readRescues); safe(readReactive);
+  }, 10_000);
   // the mode picker only shows when the deployed DemoLoan supports repay runs
   const hasModes = await call(A.user, SEL.mode).then(() => true).catch(() => false);
   document.querySelectorAll('[data-mode-pick]').forEach((el) => { el.hidden = !hasModes; });
