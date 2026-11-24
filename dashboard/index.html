@@ -125,6 +125,7 @@
   .ui-win__who a { margin-left: 8px; font-size: 13px; }
   /* the hero's button sits under its words on every width, not out on the right line */
   .hero--triptych .hero__cta--left { justify-content: flex-start; margin-top: var(--s-6); flex-direction: column; align-items: flex-start; gap: var(--s-2); } /* stacked: the text column is narrow */
+  @media (max-width: 639px) { .hero--triptych .hero__cta--left { margin-top: var(--s-2); } } /* the hero, lead and both buttons fit a 390x844 screen */
   .mode-help { margin: 0 0 var(--s-5); line-height: 1.5; } /* room before the status line under it */
   .mode-pick { margin-bottom: var(--s-2); }
   .loan-size { margin: 0; max-width: 40ch; }
@@ -273,14 +274,14 @@
     <div class="wrap"><div class="hero-text grid hero__grid">
       <div class="span-5">
         <h1 id="hero-h">Rescue your loan before liquidation</h1>
-        <p class="hero__lead">Set a trigger and a target. When the price falls, Rebound repays debt or adds collateral from your reserve in 1.4 s. Try it on an Aave-style test loan.</p>
-        <div class="hero__cta hero__cta--left"><a class="btn btn--secondary" href="#speed">Watch a recorded rescue</a><a class="btn btn--primary" href="#live" data-run>Run a testnet rescue</a></div>
+        <p class="hero__lead">Set a trigger and a target. When the price falls, Rebound repays debt or adds collateral from your reserve. Median rescue time was 1.4 seconds across 10 testnet rounds. Try it on an Aave-style test loan.</p>
+        <div class="hero__cta hero__cta--left"><a class="btn btn--secondary" href="#speed">Explore a recorded rescue</a><a class="btn btn--primary" href="#live" data-run>Run a testnet rescue</a></div>
       </div>
       <div class="ly-collage span-6 start-7" role="img" aria-label="A recorded rescue: WETH falls to 1,800 dollars, the demo loan's health factor drops to 1.08, and the shield repays 1.257 USDC six blocks later, lifting it to 1.40">
         <div class="ly-collage__set is-on">
           <div class="ly-piece" style="left: 4%; top: 0%; width: 50%"><span class="pc-lbl">Recorded rescue · 24 Nov 2026</span><span class="pc-big">$1,800</span><span class="pc-mono">WETH, down 10% on Base Sepolia</span></div>
           <div class="ly-piece pc-dark" style="left: 44%; top: 34%; width: 52%"><span class="pc-lbl">Health factor</span><span class="pc-big">1.08 → 1.40</span><div class="pc-bar"><i style="width:56%"></i></div><span class="pc-mono">trigger 1.15 · target 1.40</span></div>
-          <div class="ly-piece" style="left: 8%; top: 64%; width: 44%"><span class="pc-chip">Rescued in 6 blocks</span><span class="pc-mono">1.257 USDC of debt repaid</span><span class="pc-mono">fee 0.0001 ETH</span></div>
+          <div class="ly-piece" style="left: 8%; top: 64%; width: 44%"><span class="pc-chip">Rescued</span><span class="pc-mono">6 blocks after the drop</span><span class="pc-mono">1.257 USDC of debt repaid</span><span class="pc-mono">fee 0.0001 ETH</span></div>
         </div>
         <div class="ly-collage__set" aria-hidden="true">
           <div class="ly-piece" style="left: 6%; top: 0%; width: 56%"><span class="pc-lbl">Price event to rescue, median</span><span class="pc-big" data-live="median">…</span><span class="pc-mono" data-live="rounds">testnet benchmark</span></div>
