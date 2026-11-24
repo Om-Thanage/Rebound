@@ -307,7 +307,7 @@ Sepolia ETH (for the lead feed), and Lasna lREACT (send Sepolia ETH to the fauce
 
 ```bash
 cp .env.example .env              # then put your testnet PRIVATE_KEY in .env (or point ENV_FILE at another file)
-forge test                        # 54 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
+forge test                        # 55 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
 bash script/deploy.sh             # predicts every address, deploys lead feed, Lasna, then Base; writes deployments.env
 bash script/status.sh             # health check: lREACT runway in demo runs, CRON firing, ledger, demo loan
 node script/export-deployment.mjs # points the dashboard at the new deployment
@@ -344,13 +344,13 @@ for new blocks; if Blockscout fails, it reads up to a day over RPC and says whic
 | `src/ShieldReactive.sol` | reactive contract: mirrors loans, buckets, early and lead-feed requests, aggregator following, CRON |
 | `src/DemoLoan.sol` | a protected loan anyone can reset and crash in two steps, in either mode |
 | `src/mocks/` | lending pool with Aave V3's signatures and maths (two collateral assets), Chainlink-style feeds, test tokens |
-| `test/Shield.t.sol` | 54 tests with a mocked system contract and callback proxy |
+| `test/Shield.t.sol` | 55 tests with a mocked system contract and callback proxy |
 | `script/` | deploy, demo, lead feed, benchmark, exports |
 | `dashboard/` | the live page |
 
 ## Fixes after v4 (in the code, not yet deployed)
 
-An outside review of `f38a97a` found five problems. All five are fixed here with a test each (54 tests). The
+An outside review of `f38a97a` found five problems. All five are fixed here with a test each (55 tests). The
 dashboard fix is live; the contract fixes take effect at the next deploy, so the deployed v4 still has them.
 
 | Problem | Fix | Live? |

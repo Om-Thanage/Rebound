@@ -497,9 +497,12 @@ contract ShieldReactive is AbstractReactive {
         list[idx] = last;
         positions[last].slotIdx = uint32(idx);
         list.pop();
-        if (list.length == 0 && p.slot > 1) {
+        if (p.slot > 1) {
+            uint256 asset = p.slot - 2;
             uint256 key = p.bucketKey;
-            occupied[p.slot - 2][key >> 8] &= ~(1 << (key & 255));
+            // the last loan just moved into this slot; if an interrupted scan already passed it, step back to it
+            if (resumeKey[asset] == key + 1 && idx < resumeIdx[asset]) resumeIdx[asset] = idx;
+            if (list.length == 0) occupied[asset][key >> 8] &= ~(1 << (key & 255));
         }
         p.slot = 0;
     }

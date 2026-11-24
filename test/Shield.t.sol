@@ -844,6 +844,33 @@ contract ShieldTest is Test {
         assertLe(rc.positionsChecked() - checkedBefore, 151 - first, "did not re-check the front of the bucket");
     }
 
+    /// Rescues that land between two ticks take their loans out of the bucket, and the bucket's last loans move
+    /// into their slots. When the interrupted scan finishes, every loan in the bucket must have been asked about.
+    function test_resumedScanStillReachesLoansMovedByLandedRescues() public {
+        _movePrice(2000e8);
+        address[] memory users = new address[](150);
+        for (uint256 i; i < 150; ++i) {
+            users[i] = address(uint160(0xC000 + i));
+            _openLoan(users[i], 1 ether, 1300e6); // all trigger at about $1,812: one bucket
+            _protect(users[i], 0.5 ether);
+        }
+        _movePrice(1700e8);
+        uint256 first = sys.callbackCount();
+        assertGt(rc.resumeKey(0), 0, "the first tick stopped inside the bucket");
+        for (uint256 i; i < 5 && i < first; ++i) {
+            _deliver(i); // the snapshot moves the bucket's last loan into this one's slot
+        }
+        sys.setLight(true); // cheap requests from here on, so a tick serves more loans
+        for (uint256 t; t < 40 && rc.resumeKey(0) != 0; ++t) {
+            _movePrice((1699 - t) * 1e8);
+        }
+        assertEq(rc.resumeKey(0), 0, "the interrupted scan finished");
+        for (uint256 i; i < 150; ++i) {
+            (,,,,, uint64 lastRescueAt,,,) = shield.protections(users[i]);
+            assertTrue(_pending(users[i]) || lastRescueAt > 0, "every loan asked about");
+        }
+    }
+
     /// The worst tick: a crash that puts every loan under its trigger at once. Each check is capped per tick, so
     /// react() stays under Reactive's 900,000 gas limit for a reactive transaction; the rest go on later ticks.
     function test_worstCaseTickStaysUnderReactiveGasLimit() public {
