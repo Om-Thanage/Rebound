@@ -209,7 +209,6 @@
   .trip li { line-height: 1.5; }
   .receipt__tx { margin-top: var(--s-4); line-height: 1.8; }
   .receipt__note { max-width: 80ch; line-height: 1.5; margin-top: var(--s-2); }
-  .sim__tag { color: #c2410c; }
   /* body text that is not a label reads at 7:1 or more */
   .mode-help, .steps__d, #speed [data-live="summary"], p.muted.receipt__note, #how p.muted { color: #484848; }
   .hero--triptych .hero__grid > .span-5 { align-self: start; } /* top-aligned with the collage beside it */
@@ -429,7 +428,6 @@
     <div class="wrap">
       <div class="grid">
         <div class="span-6 stack-4">
-          <p class="t-label sim__tag">Historical simulation · 24 loan scenarios · not measured on testnet</p>
           <h2 id="sim-h">Rebound against repaying upfront</h2>
           <p>We replayed real Chainlink ETH/USD updates from four crashes (May 2021, August 2024, October 2025, February 2026) against identical loans with the same reserve, 20% of the debt, under three strategies.</p>
           <p>In these scenarios Rebound matched upfront repayment's liquidation count, cost $268 more in total, and left $17,724 of the reserves unspent. It was never late, even with a 300 s delay.</p>
