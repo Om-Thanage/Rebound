@@ -25,7 +25,7 @@ const SEL = { account: '0xbf92857c', price: '0xb3596f07', prot: '0x613e3fc0', le
 const RESCUED = '0x28b6c2526f0d05eac057487199a229c2584389d09c1a5b014dcf02610fdd8419';
 const DETAIL = '0xd6a7d2fcb36c3966223a7015df24966d5b6b9a16ae2770e4708df14e86565b3f'; // RescueDetail: repaid debt, hint
 const MODES = ['Collateral', 'Repay', 'Combined'];
-let demoMode = 0; // the mode the visitor picked for the next run
+let demoMode = 0; // the mode the next Run a rescue uses
 
 async function loadDeployment() {
   try {
@@ -63,7 +63,8 @@ async function readLoan() {
     call(A.pool, SEL.debt + arg(A.user)),
   ]);
   const h = acct[5];
-  set('who', `Demo loan ${A.user.slice(0, 6)}…${A.user.slice(-4)}`);
+  set('who', `Demo loan ${A.user.slice(0, 6)}…${A.user.slice(-4)} ↗`);
+  document.querySelectorAll('[data-live="who"]').forEach((a) => { a.href = `${SCOUT}/address/${A.user}`; });
   set('hf', hf(h));
   set('price', '$' + (Number(price) / 1e8).toLocaleString('en-US', { maximumFractionDigits: 0 }));
   set('coll', eth(coll, 4) + ' WETH');
@@ -73,7 +74,7 @@ async function readLoan() {
   const mode = prot.length >= 9 ? Number(prot[7]) : 0;
   if (prot.length >= 9) {
     set('repay-reserve', (Number(prot[1]) / 1e6).toFixed(2) + ' USDC');
-    set('mode', MODES[mode] || '–');
+    renderMode();
   }
   set('cover', coverNote(acct, price, prot, mode));
   // the gauge runs from HF 0.5 to 2.0; the trigger (1.15) and target (1.40) marks sit at 43% and 60%
@@ -139,7 +140,14 @@ async function readReactive() {
   set('checked', ticks > 0n ? `${(Number(checked) / Number(ticks)).toFixed(1)} per event, ${watched}` : watched);
   set('requested', `${requested} (${early} early)`);
   set('cron', String(cron));
-  set('loans', String(users));
+  set('loans', `Watching ${users} ${users === 1n ? 'loan' : 'loans'}`);
+  // tooltip: which loans those are, read from ShieldReactive's own list
+  const n = Number(users > 20n ? 20n : users);
+  const who = await Promise.all([...Array(n).keys()].map((i) => call(REACTIVE, '0x803ae518' + i.toString(16).padStart(64, '0'), LASNA)
+    .then((w) => '0x' + w[0].toString(16).padStart(40, '0')).catch(() => null)));
+  const name = (a) => a.toLowerCase() === A.user.toLowerCase() ? 'Demo loan' : a.toLowerCase() === '0x312d0201519e71a0a7704f7a349d35b129615fcd' ? 'Benchmark loan' : 'Loan';
+  const list = who.filter(Boolean).map((a) => `${name(a)} ${a.slice(0, 6)}…${a.slice(-4)}`).join(', ');
+  document.querySelectorAll('[data-live="loans"]').forEach((el) => { el.dataset.tip = `Loans ShieldReactive re-checks on every price update: ${list || 'none yet'}`; });
   const left = reserve + own - debt;
   set('lreact', debt > 0n
     ? `in debt by ${eth(debt, 3)}: paused until topped up`
@@ -249,7 +257,7 @@ async function readRescues() {
     li.innerHTML = `<span class="ui-avatar" data-tone="${tone}"></span><span class="ui-win__who"><span></span><a target="_blank" rel="noopener"></a></span><span class="ui-win__sub"></span><span class="ui-win__age"></span>`;
     li.children[0].textContent = avatar;
     li.children[1].firstChild.textContent = label;
-    li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)} · HF ${hf(before)} → ${hf(after)}`;
+    li.children[2].textContent = `${did[0].toUpperCase() + did.slice(1)}, HF ${hf(before)}→${hf(after)}`;
     const a = li.children[1].lastChild;
     a.href = `${SCOUT}/tx/${l.transactionHash}`;
     a.title = l.transactionHash;
@@ -271,6 +279,9 @@ function applyFilter() {
   document.querySelectorAll('[data-live="rows"] li[data-loan]').forEach((li) => {
     li.hidden = rescueFilter !== 'all' && li.dataset.loan !== rescueFilter;
   });
+  const shown = [...document.querySelectorAll('[data-live="rows"] li[data-loan]')].filter((li) => !li.hidden).length;
+  const label = { all: 'all loans', demo: 'the demo loan', bench: 'the benchmark loan', other: 'other loans' }[rescueFilter] || 'all loans';
+  set('showing', `${shown} ${shown === 1 ? 'rescue' : 'rescues'} of ${label}, newest first`);
   document.querySelectorAll('button[data-filter]').forEach((b) => {
     const on = b.dataset.filter === rescueFilter;
     b.classList.toggle('is-on', on);
@@ -334,10 +345,16 @@ loadDeployment().then(async () => {
 });
 // only the picker's buttons: the design kit also sets data-mode="light" on <html>
 const modeButtons = document.querySelectorAll('button[data-mode]');
+// the Mode cell shows the mode the next Run a rescue uses: Adding collateral until the visitor picks Repaying debt
+function renderMode() {
+  modeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.mode === String(demoMode))));
+  set('mode', MODES[demoMode]);
+}
 modeButtons.forEach((b) => b.addEventListener('click', () => {
   demoMode = b.dataset.mode === '1' ? 1 : 0;
-  modeButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  renderMode();
 }));
+renderMode();
 
 // ---- Run a rescue: the visitor's wallet calls DemoLoan.run(); the five steps on the page follow the loop
 const REQUESTED = '0x831e6fe83ba01a4c7028ae204aa408895d0122a5656622d38f09941a22543423'; // RescueRequested(user, hf, price, hint) on Lasna

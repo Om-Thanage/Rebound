@@ -1,7 +1,11 @@
 {
-  "name": "Parapet",
+  "name": "Rebound",
   "searched": true,
   "queries": [
-    { "query": "\"Parapet\" DeFi crypto liquidation protocol", "result": "no project or business named Parapet in the first results; only general liquidation articles and papers" }
-  ]
+    {
+      "query": "\"Rebound\" DeFi protocol crypto liquidation lending",
+      "result": "no DeFi protocol or crypto project named Rebound in the results; only general liquidation articles and papers"
+    }
+  ],
+  "previous": "Parapet"
 }

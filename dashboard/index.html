@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Parapet: liquidation shield for Aave-style loans</title>
+<title>Rebound: liquidation shield for Aave-style loans</title>
 <meta name="description" content="A keeperless shield on Reactive Network that tops up a falling loan within seconds of a price drop, paid by a 0.3% rescue fee.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Parapet: liquidation shield for Aave-style loans">
+<meta property="og:title" content="Rebound: liquidation shield for Aave-style loans">
 <meta property="og:description" content="Collateral added within seconds of a price drop, live on Base Sepolia and Reactive Lasna.">
 <meta property="og:image" content="share.jpg">
 <meta name="twitter:card" content="summary_large_image">
@@ -60,10 +60,11 @@
   .pc-bar { height: 1.6cqw; background: var(--p-surface); position: relative; }
   .pc-bar i { position: absolute; inset: 0 auto 0 0; background: var(--p-ink); }
   .pc-dark { background: var(--p-inv-bg) !important; color: var(--p-inv-ink) !important; }
+  .ly-collage .ly-piece.pc-dark { z-index: 2; } /* the dark card is the point of each set: keep it on top */
   .pc-dark .pc-lbl, .pc-dark .pc-mono { color: var(--p-inv-muted); }
 
   /* app-frame (sections-library.md) */
-  .app.ui { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
+  .app.ui { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
   .app > .app__pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
   .app > .app__pane + .app__pane { border-left: 1px solid var(--u-line); }
   .app > .app__pane > .ui-panel { width: 100%; border: 0; border-radius: 0; box-shadow: none; }
@@ -71,7 +72,7 @@
   .app > .app__pane--list { overflow-y: auto; overscroll-behavior: contain; }
   .app > .app__pane--list::after { display: none; }
   .app > .app__pane::after { content: ""; position: absolute; inset: auto 0 0 0; height: 64px; background: linear-gradient(transparent, var(--u-bg)); pointer-events: none; }
-  @media (min-width: 1024px) and (max-width: 1279px) { .app.ui { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); } }
+  @media (min-width: 1024px) and (max-width: 1279px) { .app.ui { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
   @media (max-width: 1023px) {
     .app.ui { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
     .app > .app__pane--list { max-height: 252px; }
@@ -123,8 +124,40 @@
   .ui-win__who a { margin-left: 8px; font-size: 13px; }
   /* the hero's button sits under its words on every width, not out on the right line */
   .hero--triptych .hero__cta--left { justify-content: flex-start; margin-top: var(--s-6); }
-  .mode-help { margin: 0; line-height: 1.5; }
-  button.ui-win__nav { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; width: 100%; text-align: left; }
+  .mode-help { margin: 0 0 var(--s-5); line-height: 1.5; } /* room before the status line under it */
+  .mode-pick { margin-bottom: var(--s-2); }
+  .loan-size { margin: 0; max-width: 40ch; }
+  a.pos__who { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+  a.pos__who:hover { color: var(--p-ink); }
+  /* instant tooltips: hover or keyboard focus shows data-tip; wide invisible hit area on the 2px gauge marks */
+  .tip { cursor: help; }
+  .tip:focus-visible { outline: 2px solid var(--p-ink); outline-offset: 2px; }
+  .pos__gauge b.tip::before { content: ""; position: absolute; inset: -6px -8px; }
+  .tip::after { content: attr(data-tip); position: absolute; z-index: 30; pointer-events: none; opacity: 0; transition: opacity .12s;
+    bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: max-content; max-width: 240px;
+    padding: 6px 9px; border-radius: 6px; background: var(--p-ink); color: #fff; font: 400 12px/1.4 var(--font-text); white-space: normal; text-align: left; }
+  .tip:hover::after, .tip:focus-visible::after { opacity: 1; }
+  .pos__gauge b.tip:first-of-type::after { left: 0; transform: translateX(-12px); }
+  .tip--up { position: relative; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .tip--up::after { left: 0; transform: none; max-width: 132px; }
+  .pos__cell .pos__sub { font-size: 12px; color: var(--p-muted); }
+  /* the selected filter must read as selected: dark fill, white text */
+  button.ui-win__nav.is-on, button.ui-win__nav[aria-pressed="true"] { background: var(--p-ink); color: #fff; font-weight: 500; }
+  button.ui-win__nav.is-on em, button.ui-win__nav.is-on .ui-win__hash { color: #fff; }
+  /* the sidebar: wide enough for "Benchmark 11", and its one column never grows past it */
+  @container ui-win (min-width: 420px) { /* only while the kit shows the sidebar; under 420px it hides it */
+    .app .ui-win__body, .app .ui-win.ui-win--compact .ui-win__body { grid-template-columns: 148px minmax(0, 1fr); }
+  }
+  .app .ui-win__side { grid-template-columns: minmax(0, 1fr); }
+  .app .ui-win__nav { min-width: 0; white-space: nowrap; }
+  /* rescue rows: always the kit's two-line layout (loan and link, then what the rescue did), at every width */
+  .app .ui-win__cols { display: none; }
+  .app .ui-win__row { grid-template-columns: 24px minmax(0, 1fr); grid-template-rows: 18px 16px; align-content: center; height: 56px; row-gap: 1px; padding: 0 14px; }
+  .app .ui-win__row .ui-avatar { grid-row: 1 / 3; }
+  .app .ui-win__who { grid-column: 2; grid-row: 1; line-height: 18px; }
+  .app .ui-win__sub { grid-column: 2; grid-row: 2; font-size: 13px; }
+  .app .ui-win__age { display: none; }
+  button.ui-win__nav { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; width: auto; text-align: left; }
   a.ui-win__nav { color: inherit; text-decoration: none; cursor: pointer; }
   button.ui-win__nav:hover, a.ui-win__nav:hover { background: var(--u-fill-2, rgb(35 35 35 / .06)); }
   a.ui-win__nav:hover { text-decoration: underline; }
@@ -144,7 +177,11 @@
   @media (max-width: 1023px) { .steps { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); } .steps li { padding-top: var(--s-2); } }
   .run-status a { font-family: var(--font-mono); }
   .mode-pick { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
-  .mode-pick button[aria-pressed="true"] { background: var(--p-ink); color: #fff; }
+  /* the two rescue modes: explicit states, stronger than the motion layer's secondary-button hover */
+  html .mode-pick .btn.btn--secondary { background: var(--p-surface); color: var(--p-ink); border-color: transparent; }
+  html .mode-pick .btn.btn--secondary:hover { background: #e2e2e2; color: var(--p-ink); border-color: transparent; }
+  html .mode-pick .btn.btn--secondary[aria-pressed="true"] { background: var(--p-ink); color: #fff; border-color: var(--p-ink); }
+  html .mode-pick .btn.btn--secondary[aria-pressed="true"]:hover { background: #3d3d3d; color: #fff; border-color: #3d3d3d; }
   .pos__warn { font-size: 13px; color: #c2410c; }
   .ledger__sub { border-top: 1px solid var(--u-line); padding-top: 12px; display: grid; gap: 8px; }
   .fee-compare { margin-top: var(--s-8); }
@@ -181,7 +218,7 @@
 <header class="nav">
   <div class="wrap nav__bar">
     <a class="skip-link" href="#top">Skip to content</a>
-    <a class="nav__logo" href="#top"><span class="mark mark--initial" aria-hidden="true">P</span>Parapet</a>
+    <a class="nav__logo" href="#top"><span class="mark mark--initial" aria-hidden="true">R</span>Rebound</a>
     <nav class="nav__links" aria-label="Main">
       <div class="nav__item">
         <a class="nav__link" href="#how">Product <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
@@ -223,10 +260,10 @@
     <div class="wrap"><div class="hero-text grid hero__grid">
       <div class="span-3">
         <h1 id="hero-h">Liquidation shield for Aave loans</h1>
-        <p class="hero__lead">When the price drops, Parapet adds collateral to your loan in about 1.4 seconds, with no keeper bot, and keeps 0.3% as its fee.</p>
+        <p class="hero__lead">When the price drops, Rebound adds collateral to your loan in about 1.4 seconds, with no keeper bot, and keeps 0.3% as its fee.</p>
         <div class="hero__cta hero__cta--left"><a class="btn btn--primary" href="#live" data-run>Run a rescue</a></div>
       </div>
-      <div class="ly-collage span-6 start-4" role="img" aria-label="Cards from a live rescue: WETH falls to 1,800 dollars, the health factor drops to 1.08, and the shield lifts it back to 1.40 seven blocks later">
+      <div class="ly-collage span-8 start-5" role="img" aria-label="Cards from a live rescue: WETH falls to 1,800 dollars, the health factor drops to 1.08, and the shield lifts it back to 1.40 seven blocks later">
         <div class="ly-collage__set is-on">
           <div class="ly-piece" style="left: 4%; top: 6%; width: 50%"><span class="pc-lbl">WETH price · Base Sepolia</span><span class="pc-big">$1,800</span><span class="pc-mono">down 10% in one update</span></div>
           <div class="ly-piece pc-dark" style="left: 44%; top: 34%; width: 52%"><span class="pc-lbl">Health factor</span><span class="pc-big">1.08 → 1.40</span><div class="pc-bar"><i style="width:56%"></i></div><span class="pc-mono">trigger 1.15 · target 1.40</span></div>
@@ -247,7 +284,7 @@
   <section class="section" id="live" style="--hm: 2" aria-labelledby="live-h">
     <div class="wrap">
       <div class="grid">
-        <h2 id="live-h" class="span-5">A demo loan you can crash</h2>
+        <div class="span-5 stack-4"><h2 id="live-h">A demo loan you can crash</h2><p class="loan-size">A small test loan: <b>0.004 WETH</b> (about $8 at $2,000) backing <b>5.50 USDC</b> of debt, with 0.003 WETH and 10 USDC set aside for rescues.</p><div><a class="btn btn--primary" href="#live" data-run>Run a rescue</a></div></div>
         <div class="span-6 start-7 stack-2"><p>Press Run a rescue and follow the five steps below. Your one transaction crashes the price; everything after it happens on its own, with no keeper bot.</p><div class="mode-pick" role="group" aria-label="How the shield rescues the demo loan" data-mode-pick hidden><span class="pos__note">Rescue by</span><button type="button" class="btn btn--secondary btn--sm" data-mode="0" aria-pressed="true">Adding collateral</button><button type="button" class="btn btn--secondary btn--sm" data-mode="1" aria-pressed="false">Repaying debt</button></div><p class="pos__note mode-help"><b>Adding collateral:</b> the shield puts more of your spare WETH under the loan. <b>Repaying debt:</b> it pays back part of the USDC you borrowed from your spare USDC instead, which needs about 1.7 times less money for the same safety.</p><p class="run-status" role="status" data-run-status>Needs a browser wallet on Base Sepolia with a little test ETH. One run a minute.</p></div>
       </div>
       <ol class="steps" data-steps aria-label="What one run does">
@@ -262,7 +299,7 @@
           <div class="ui ui-panel ui-win" data-ui="window" data-open="Rescued" data-work="Pending" data-done="Rescued">
             <div class="ui-win__bar">
               <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="ui-win__crumb">Parapet <i>/</i> <b>Every rescue, newest first</b></span>
+              <span class="ui-win__crumb">Rebound <i>/</i> <b data-live="showing">Every rescue, newest first</b></span>
               <span class="ui-spacer"></span>
             </div>
             <div class="ui-win__body">
@@ -275,7 +312,7 @@
                 <span class="ui-win__label">Contracts</span>
                 <a class="ui-win__nav" data-live-href="shield" href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc" target="_blank" rel="noopener">Shield, Base ↗</a>
                 <a class="ui-win__nav" data-live-href="reactive" href="https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345" target="_blank" rel="noopener">Reactive, Lasna ↗</a>
-                <span class="ui-win__label">Loans watched: <b data-live="loans">2</b></span>
+                <span class="ui-win__label tip tip--up" tabindex="0" data-live="loans" data-tip="Loans ShieldReactive re-checks on every price update">Watching 2 loans</span>
                 <span class="ui-win__label" data-live="coverage"></span>
               </nav>
               <div class="ui-win__main">
@@ -289,16 +326,16 @@
         </div>
         <div class="app__pane app__pane--open">
           <div class="ui ui-panel pos">
-            <div class="pos__head"><span class="pos__who" data-live="who">Demo loan 0x3673…4573</span><span class="pos__note" data-live="updated">Reading the chain</span></div>
+            <div class="pos__head"><a class="pos__who" data-live="who" href="https://base-sepolia.blockscout.com/address/0x46902207FaE37E608b858f59e8c8BfCACD7073f5" target="_blank" rel="noopener">Demo loan 0x4690…73f5 ↗</a><span class="pos__note" data-live="updated">Reading the chain</span></div>
             <div><span class="pos__note">Health factor</span><p class="pos__hf" data-live="hf">1.40</p></div>
-            <div class="pos__gauge" aria-hidden="true"><i data-live="gauge" style="width:56%"></i><b style="left:43%"></b><b class="t" style="left:60%"></b></div>
+            <div class="pos__gauge"><i data-live="gauge" style="width:56%" aria-hidden="true"></i><b class="tip" tabindex="0" style="left:43%" data-tip="Red: the trigger, health factor 1.15. Below it the shield asks for a rescue." aria-label="Trigger: health factor 1.15"></b><b class="t tip" tabindex="0" style="left:60%" data-tip="Green: the target, health factor 1.40. A rescue lifts the loan back to here." aria-label="Target: health factor 1.40"></b></div>
             <div class="pos__grid">
               <div class="pos__cell"><span>WETH price</span><strong data-live="price">$1,800</strong></div>
               <div class="pos__cell"><span>Collateral</span><strong data-live="coll">0.0052 WETH</strong></div>
               <div class="pos__cell"><span>Debt</span><strong data-live="debt">5.50 USDC</strong></div>
               <div class="pos__cell"><span>Shield reserve</span><strong data-live="reserve">0.0011 WETH</strong></div>
               <div class="pos__cell"><span>Repay reserve</span><strong data-live="repay-reserve">–</strong></div>
-              <div class="pos__cell"><span>Mode</span><strong data-live="mode">Collateral</strong></div>
+              <div class="pos__cell"><span>Mode</span><strong data-live="mode">–</strong></div>
               <div class="pos__cell"><span>Trigger</span><strong>1.15</strong></div>
               <div class="pos__cell"><span>Target</span><strong>1.40</strong></div>
             </div>
@@ -314,18 +351,18 @@
     <div class="wrap">
       <div data-moment="liquid-type" class="section-head" style="max-width:none">
         <h2 id="fee-h" class="mo-lt__type">Pay 0.3% instead of 5%</h2>
-        <p>Aave gives liquidators a 5% bonus on WETH collateral. Parapet keeps 0.3% of the value it moves, with a floor of 0.0001 ETH, gas included.</p>
+        <p>Aave gives liquidators a 5% bonus on WETH collateral. Rebound keeps 0.3% of the value it moves, with a floor of 0.0001 ETH, gas included.</p>
       </div>
       <div class="grid fee-compare">
         <div class="span-6 stack-2"><p class="t-stat">5% of the seized collateral</p><p class="muted">Paid to a liquidator when the health factor falls under 1.0</p></div>
-        <div class="span-6 start-7 stack-2"><p class="t-stat">0.3% of the rescue</p><p class="muted">Paid to Parapet when the health factor falls under 1.15. Repaying debt instead of adding collateral needs 1.7 times less money</p></div>
+        <div class="span-6 start-7 stack-2"><p class="t-stat">0.3% of the rescue</p><p class="muted">Paid to Rebound when the health factor falls under 1.15. Repaying debt instead of adding collateral needs 1.7 times less money</p></div>
       </div>
     </div>
   </section>
 
   <section class="section" id="how" aria-labelledby="how-h">
     <div class="wrap">
-      <div class="section-head"><h2 id="how-h">Parapet's rescue loop, from price event to callback</h2></div>
+      <div class="section-head"><h2 id="how-h">Rebound's rescue loop, from price event to callback</h2></div>
       <div class="grid">
         <div class="span-6 stack-4">
           <p>A Chainlink-style feed on Base Sepolia emits <code>AnswerUpdated</code>. ShieldReactive on Reactive Lasna re-prices only the loans whose trigger price is near the new price, and requests a callback for each one under its trigger, or about to be if the price keeps falling at the same speed.</p>
@@ -343,7 +380,7 @@
     <div class="wrap">
       <div class="grid">
         <div class="span-6 stack-4">
-          <h2 id="speed-h">Parapet's rescue latency, measured on testnets</h2>
+          <h2 id="speed-h">Rebound's rescue latency, measured on testnets</h2>
           <p>Each round resets the loan, drops WETH from $2,000 to $1,800 and counts Base blocks from the price event to the rescue. Base Sepolia makes a block every 200 ms.</p>
           <p class="t-stat" data-live="median-big">1.2 s</p>
           <p class="t-small muted" data-live="summary">Median of the measured rounds</p>
@@ -363,7 +400,7 @@
     <div class="wrap">
       <div class="grid">
         <div class="span-6 stack-4">
-          <h2 id="fees-h">Parapet's fees pay its callback gas</h2>
+          <h2 id="fees-h">Rebound's fees pay its callback gas</h2>
           <p>Every fee is unwrapped to ETH inside the shield, and the callback proxy takes its gas from that balance. A small daily watch fee covers loans that are watched but never rescued. Execution on Lasna is paid in lREACT, funded by hand on testnet; the panel shows how much work it does.</p>
           <p>Everything runs on Base Sepolia and Reactive Lasna testnets with test tokens. The pool copies Aave V3's function names and health factor maths so the demo can move the price.</p>
           <a class="link" href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc">Open the shield on Blockscout</a>
@@ -404,7 +441,7 @@
     <div class="closing__links">
       <div class="grid">
         <div class="span-6 stack-4">
-          <a class="nav__logo" href="#top"><span class="mark mark--initial" aria-hidden="true">P</span>Parapet</a>
+          <a class="nav__logo" href="#top"><span class="mark mark--initial" aria-hidden="true">R</span>Rebound</a>
           <p class="footer__lede">A liquidation shield built for the Reactive Omni Buildathon.</p>
         </div>
         <div class="span-2 footer__col"><h3>Shield</h3><ul><li><a href="#live">Live</a></li><li><a href="#how">Loop</a></li></ul></div>
@@ -412,7 +449,7 @@
         <div class="span-2 footer__col"><h3>Chains</h3><ul><li><a href="https://base-sepolia.blockscout.com/address/0x6dAa01C49DfE0c8ccd01A2ABC32F1A3229Eb6DFc">Base Sepolia</a></li><li><a href="https://lasna.reactscan.net/address/0x49074f7961c01416cf5A57d13df664C32fb33345">Reactive Lasna</a></li></ul></div>
       </div>
       <div class="footer__legal">
-        <span>&copy; 2026 Parapet</span>
+        <span>&copy; 2026 Rebound</span>
         <div class="socials"></div>
       </div>
     </div>
