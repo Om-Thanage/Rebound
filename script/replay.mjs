@@ -44,6 +44,8 @@ function run(updates, startHf, strategy, delay) {
 
   let pending = null; // a requested rescue: { landAt, hint }
   let cooldownUntil = 0;
+  // shortcut: fees come out of the same dollar reserve as repayments; the deployed shield takes them from a separate
+  // WETH reserve. Model two reserves if the dollar comparison needs to be exact.
   const land = (price) => { // the shield, when the callback lands: re-check live, size at the clamped hint, repay
     const hint = pending.hint;
     pending = null;
@@ -152,7 +154,9 @@ V3. Liquidation happens at the oracle update that puts HF under 1.0, in the same
 at that update can land. A rescue requested at update *i* lands \`delay\` seconds later at the latest price known
 then; if a later update liquidates first, it counts as late. The rescue re-checks the live HF (with the hint, at
 most 5% under the oracle), repays the smallest amount that reaches ${A.target} at that price, and pays 0.3% of what
-it repays (floor ${A.minFeeEth} ETH) from the reserve; a short reserve gives a partial rescue. Watch fee
+it repays (floor ${A.minFeeEth} ETH) from the reserve; a short reserve gives a partial rescue. **Simplification:**
+the replay pays fees out of the same dollar reserve it repays from; the deployed shield repays from a USDC reserve
+and takes fees from a separate WETH reserve, so in practice the borrower also keeps a little WETH for fees. Watch fee
 ${A.watchFeeEthPerDay} ETH a day. Interest ${A.apr * 100}% a year on outstanding debt. One collateral asset, USDC
 at $1. The Ethereum mainnet feed stands in for Base's (Base's own feed updates on the same deviation rules).
 Cost = liquidation bonus lost + fees + interest, in USD. Not modelled: gas for the upfront repayment, the

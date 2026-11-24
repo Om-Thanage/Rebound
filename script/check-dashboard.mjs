@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-const src = readFileSync(new URL('../dashboard/live.js', import.meta.url), 'utf8');
+const src = readFileSync(new URL('../dashboard/live.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n'); // Windows checkouts
 const block = src.match(/const TRIGGER[\s\S]*?\n}\n/)[0]; // TRIGGER, TARGET, hfDown, rescueOutcome
 const rescueOutcome = new Function(`${block}; return rescueOutcome;`)();
 const E15 = 10n ** 15n;

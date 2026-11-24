@@ -305,7 +305,9 @@ With the same reserve, Rebound prevented as many liquidations as repaying upfron
 whose reserve was too small for a 39% fall. Rebound was never late or missed a loan, even with a 300 s delay:
 Chainlink moves in steps of about 0.5%, so a loan crosses 1.15 well before 1.0. It cost $268 more in total (fees,
 and interest on debt it repaid later), and in exchange left 19% of the reserves unspent, where no crash reached
-them. Not modelled: gas for the upfront repayment, what the borrower earns on an unspent reserve, a feed that
+them. One simplification matters for the dollar figures: the replay pays Rebound's fees out of the same USDC
+reserve it repays from, while the deployed shield repays from USDC and takes fees from a separate WETH reserve.
+Not modelled: gas for the upfront repayment, what the borrower earns on an unspent reserve, a feed that
 jumps more than one step at a time, and Reactive running out of lREACT.
 
 ## Deployed contracts
