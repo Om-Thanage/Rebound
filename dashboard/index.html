@@ -121,6 +121,8 @@
   a[href*="/tx/"]::after { content: " ↗"; text-decoration: none; display: inline-block; margin-left: 2px; }
   a[href*="/tx/"]:hover { color: var(--p-ink); }
   .ui-win__who a { margin-left: 8px; font-size: 13px; }
+  /* the hero's button sits under its words on every width, not out on the right line */
+  .hero--triptych .hero__cta--left { justify-content: flex-start; margin-top: var(--s-6); }
   .mode-help { margin: 0; line-height: 1.5; }
   button.ui-win__nav { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; width: 100%; text-align: left; }
   a.ui-win__nav { color: inherit; text-decoration: none; cursor: pointer; }
@@ -221,7 +223,8 @@
     <div class="wrap"><div class="hero-text grid hero__grid">
       <div class="span-3">
         <h1 id="hero-h">Liquidation shield for Aave loans</h1>
-        <p class="hero__lead">When the price drops, Parapet adds collateral to your loan in about 1.2 seconds, with no keeper bot, and keeps 0.3% as its fee.</p>
+        <p class="hero__lead">When the price drops, Parapet adds collateral to your loan in about 1.4 seconds, with no keeper bot, and keeps 0.3% as its fee.</p>
+        <div class="hero__cta hero__cta--left"><a class="btn btn--primary" href="#live" data-run>Run a rescue</a></div>
       </div>
       <div class="ly-collage span-6 start-4" role="img" aria-label="Cards from a live rescue: WETH falls to 1,800 dollars, the health factor drops to 1.08, and the shield lifts it back to 1.40 seven blocks later">
         <div class="ly-collage__set is-on">
@@ -238,7 +241,6 @@
           <div class="ly-piece" style="left: 42%; top: 52%; width: 54%"><span class="pc-lbl">Callback gas paid</span><span class="pc-big">0.00003</span><span class="pc-mono">ETH, out of fee income</span></div>
         </div>
       </div>
-      <div class="span-3 start-10 hero__cta"><a class="btn btn--primary" href="#live" data-run>Run a rescue</a></div>
     </div></div>
   </section>
 
