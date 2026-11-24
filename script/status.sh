@@ -25,7 +25,7 @@ for f in priceTicks leadTicks cronTicks positionsChecked rescuesRequested earlyR
   printf "  %-20s %s\n" "$f" "$(cast call "$REACTIVE" "$f()(uint256)" $L | num)"
 done
 cron=$(cast call "$REACTIVE" "cronTicks()(uint256)" $L | num)
-[ "$cron" = "0" ] && echo "!! cronTicks is 0: if the contract is older than a few minutes, its CRON subscription is not firing"
+[ "$cron" = "0" ] && echo "!! cronTicks is 0: expected for a few minutes after a Cron100 deploy, or about three hours after a Cron10000 one; longer means the CRON subscription is not firing"
 
 echo "== Base side: LiquidationShield $SHIELD"
 # each read stands alone: one failing call (say, no callback proxy on a local chain) must not end the check

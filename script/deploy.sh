@@ -16,7 +16,7 @@ REACTIVE_FUNDING=${REACTIVE_FUNDING:-1ether} # lREACT for the reactive contract'
 FEE_BPS=${FEE_BPS:-30}
 MIN_FEE_WEI=${MIN_FEE_WEI:-100000000000000}  # 0.0001 ETH
 WATCH_FEE_WEI_PER_DAY=${WATCH_FEE_WEI_PER_DAY:-10000000000000} # 0.00001 ETH a day per protected loan
-CRON_EVENT=${CRON_EVENT:-Cron100}            # system contract CRON event; Cron100 fires every 100 Reactive blocks
+CRON_EVENT=${CRON_EVENT:-Cron10000}          # CRON event: Cron10000 fires every 10,000 Lasna blocks (~3 h); Cron100 costs ~100x more idle
 DEMO_RESERVE=${DEMO_RESERVE:-3000000000000000} # 0.003 WETH; DemoLoan also takes 0.004 WETH of collateral
 WETH_BUCKET=${WETH_BUCKET:-1000000000}       # $10 trigger-price buckets for WETH (8 decimals)
 WBTC_BUCKET=${WBTC_BUCKET:-25000000000}      # $250 for WBTC
@@ -37,7 +37,8 @@ POOL=$(addr "$DEPLOYER" $((base_nonce + 8)))
 SHIELD=$(addr "$DEPLOYER" $((base_nonce + 9)))
 AWETH=$(addr "$POOL" 1) # the pool creates one aToken per collateral asset: WETH in its constructor,
 AWBTC=$(addr "$POOL" 2) # WBTC when it is listed
-REACTIVE=$(addr "$DEPLOYER" $((lasna_nonce)))
+# REACTIVE_DEPLOYED reuses a ShieldReactive from an earlier, interrupted run (its constructor args must match)
+REACTIVE=${REACTIVE_DEPLOYED:-$(addr "$DEPLOYER" $((lasna_nonce)))}
 LEAD_AGG=0x0000000000000000000000000000000000000000
 LEAD_ID=0
 if [ -n "$LEAD_RPC" ]; then
@@ -63,8 +64,9 @@ if [ -n "$LEAD_RPC" ]; then
 fi
 
 RC_CONFIG="($BASE_CHAIN_ID,$SHIELD,[$WETH,$WBTC],[18,8],[$AGG_WETH,$AGG_WBTC],[$PROXY_WETH,$PROXY_WBTC],[$WETH_BUCKET,$WBTC_BUCKET],$CRON_TOPIC,$LEAD_ID,$LEAD_AGG,0)"
-check "$(create "$REACTIVE_LASNA_RPC" src/ShieldReactive.sol:ShieldReactive --value "$REACTIVE_FUNDING" \
-  --constructor-args "$RC_CONFIG")" "$REACTIVE"
+# a 1 wei tip (forge's default) can sit in Lasna's pool indefinitely; pay a real one
+[ -n "${REACTIVE_DEPLOYED:-}" ] || check "$(create "$REACTIVE_LASNA_RPC" src/ShieldReactive.sol:ShieldReactive \
+  --value "$REACTIVE_FUNDING" --priority-gas-price 1gwei --constructor-args "$RC_CONFIG")" "$REACTIVE"
 echo "ShieldReactive on Lasna: $REACTIVE"
 
 check "$(create "$BASE_SEPOLIA_RPC" src/mocks/MockTokens.sol:MockWETH)" "$WETH"

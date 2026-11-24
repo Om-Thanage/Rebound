@@ -64,7 +64,7 @@ page walks through five steps as they happen. Step 4 shows ShieldReactive asking
 step, before the trigger was crossed, because the price was falling fast. One run a minute for everyone; anyone
 can refill the demo's reserve with `DemoLoan.topUp()`.
 
-**The demo loan** ([`0x4690…73f5`](https://base-sepolia.blockscout.com/address/0x46902207FaE37E608b858f59e8c8BfCACD7073f5)) is deliberately
+**The demo loan** ([`0x2Cb8…0795`](https://base-sepolia.blockscout.com/address/0x2Cb81B803689D7E2E07c04b263D4DE57cA410795)) is deliberately
 small, so test funds last. Every run resets it to the same starting point before the crash:
 
 | | Amount |
@@ -221,12 +221,13 @@ $1,800 (HF 1.08, under the 1.15 trigger) and counts Base blocks between the pric
 
 | Version | Rounds | Rescued | Median | p90 | Fastest | Slowest |
 |---|---|---|---|---|---|---|
-| Deployed (v4: v3 plus the CRON fix) | 10 | 10 | **1.4 s** (7 blocks) | 2.2 s | 0.8 s | 2.6 s |
+| Deployed (v4, redeployed with the review fixes and `Cron10000`) | 10 | 10 | **1.4 s** (7 blocks) | 1.6 s | 1.0 s | 1.6 s |
+| v4, first deploy ([`results/v4-first/`](results/v4-first/), v3 plus the CRON fix) | 10 | 10 | 1.4 s (7 blocks) | 2.2 s | 0.8 s | 2.6 s |
 | Third version ([`results/v3/`](results/v3/), the [review](docs/review.md) fixes) | 10 | 10 | 0.8 s (4 blocks) | 1.4 s | 0.6 s | 1.4 s |
 | Second version ([`results/v2/`](results/v2/)) | 10 | 10 | 1.4 s (7 blocks) | 1.8 s | 1.0 s | 2.0 s |
 | First version ([`results/v1/`](results/v1/)) | 20 | 20 | 1.2 s (6 blocks) | 1.6 s | 1.0 s | 2.0 s |
 
-Every rescue lifted the health factor to 1.40. The last two runs went through without a gap. In the first two the
+Every rescue lifted the health factor to 1.40. The last three runs went through without a gap. In the first two the
 reactive contract ran out of lREACT partway (Reactive stops calling `react()` while a contract owes it); after a
 `depositTo` the missing rounds were rerun. Runs vary by a few blocks with Lasna's load: v3 and v4 run the same
 price path, and their medians are 0.8 s and 1.4 s.
@@ -244,21 +245,23 @@ partial and missed rescues included). That is the next experiment.
 Base 0.8 s after that update confirmed, **before Base's own oracle had moved** (it followed 10 s later).
 
 **Self-funding (Base side),** from `opsLedger()` on the deployed shield after 13 rescues: 0.0013 ETH in fees against
-0.000026 ETH of callback gas, about 50 times over; the shield owes the callback proxy nothing.
+0.0000265 ETH of callback gas, about 49 times over; the shield owes the callback proxy nothing.
 
-**Repay mode, live:** `DemoLoan.runWithMode(1)` ([price](https://base-sepolia.blockscout.com/tx/0xe13678e7baae652f3364b1c4ca99b2a0d431bff8ec1420e1bf645caf565928ed),
-[rescue](https://base-sepolia.blockscout.com/tx/0x25491ee76fc96dcee74f5eddfd869995d72daf777e11236c998f101286db72c6)) was rescued
-8 blocks later with no WETH added: `RescueDetail` shows 1.257 USDC repaid, the debt fell from 5.50 to 4.24 USDC and
+**Repay mode, live:** `DemoLoan.runWithMode(1)` ([price](https://base-sepolia.blockscout.com/tx/0xcc5ebe8ede44b64540f1d8fe3e235bd586d75f7d5f56d818905ec985648e914a),
+[rescue](https://base-sepolia.blockscout.com/tx/0x7686f5e3f0c7ea9408346825c5c9f925987fc9555906e4fc9c3d06dace4c6933)) was rescued
+6 blocks later with no WETH added: `RescueDetail` shows 1.257 USDC repaid, the debt fell from 5.50 to 4.24 USDC and
 the health factor rose from 1.08 to 1.40.
 
 **CRON, live:** the first three versions subscribed to `CronN` from the Omni system contract (`0x8888…`), but
 Reactive Network emits it from `0x0000000000000000000000000000000000fffFfF`, so the sweep never ran on Lasna. v4
-subscribes there and ticks: `cronTicks` was 1 within two minutes of the deploy.
+subscribes there and ticks: `cronTicks` was 1 within two minutes of the first v4 deploy. The redeploy uses
+`Cron10000`, which Lasna emits about every three hours, so a `cronTicks` of 0 in its first hours is expected.
 
 **Reactive side, measured:** read from the system contract's `reserves()` for ShieldReactive. Idle, with no price
-moving, v4 spends about **0.017 lREACT per `Cron100` tick**, roughly 0.6 lREACT an hour (0.051 lREACT over five
-minutes and three ticks); v2, whose CRON never fired, spent nothing idle. A slower CRON (`CRON_EVENT=Cron1000` in
-`deploy.sh`) would cut that tenfold. One dashboard run (reset, two-step crash: three price events and two
+moving, the first v4 deploy spent about **0.017 lREACT per `Cron100` tick**, roughly 0.6 lREACT an hour (0.051
+lREACT over five minutes and three ticks), and ran its reserve dry in a day; v2, whose CRON never fired, spent
+nothing idle. The redeploy sweeps on `Cron10000`, a hundred times less often: about 0.15 lREACT a day at the same
+cost per tick. Rescues still come straight from price events; the sweep only catches what a tick missed. One dashboard run (reset, two-step crash: three price events and two
 loan snapshots) cost **0.111 lREACT** on the second version; the first version's simpler loop cost about 0.04. At the testnet faucet rate
 (100 lREACT per ETH) 0.111 lREACT is 0.0011 ETH, above the 0.0001 ETH fee floor; at the mid-November 2026 market
 price of REACT (about $0.0023) it is about $0.0003, which the floor covers. Watching costs gas on every price event
@@ -269,32 +272,34 @@ income to REACT and calling `depositTo` is still manual.
 
 | Contract | Network | Address |
 |---|---|---|
-| ShieldReactive | Reactive Lasna (5318007) | [`0xDF7afB41ba5C15aE5d3F7A3FA44F352CDc2D3984`](https://lasna.reactscan.net/address/0xDF7afB41ba5C15aE5d3F7A3FA44F352CDc2D3984) |
-| LiquidationShield | Base Sepolia (84532) | [`0xd9394D6847f0269C0485853AEc506450C1bB4ca0`](https://base-sepolia.blockscout.com/address/0xd9394D6847f0269C0485853AEc506450C1bB4ca0) |
-| DemoLoan | Base Sepolia | [`0x46902207FaE37E608b858f59e8c8BfCACD7073f5`](https://base-sepolia.blockscout.com/address/0x46902207FaE37E608b858f59e8c8BfCACD7073f5) |
-| MockAavePool | Base Sepolia | [`0xB106Ec7B690e79BF7BCef36a8bf9Bef37D22Ee29`](https://base-sepolia.blockscout.com/address/0xB106Ec7B690e79BF7BCef36a8bf9Bef37D22Ee29) |
-| MockAaveOracle | Base Sepolia | [`0x7799A3187B3DA9F48d7bf54f64FBBB9241f24FFc`](https://base-sepolia.blockscout.com/address/0x7799A3187B3DA9F48d7bf54f64FBBB9241f24FFc) |
-| WETH/USD feed (aggregator / proxy) | Base Sepolia | [`0x83139b4e2891b509Dc68FE66696925e1C3f1427E`](https://base-sepolia.blockscout.com/address/0x83139b4e2891b509Dc68FE66696925e1C3f1427E) |
-|  |  | [`0x728d466C8447f9D414E974Eefba55dc5aa3DEf03`](https://base-sepolia.blockscout.com/address/0x728d466C8447f9D414E974Eefba55dc5aa3DEf03) |
-| WBTC/USD feed (aggregator / proxy) | Base Sepolia | [`0x91fB170866F88A16F418772c8f9a6f0f6dbd196C`](https://base-sepolia.blockscout.com/address/0x91fB170866F88A16F418772c8f9a6f0f6dbd196C) |
-|  |  | [`0xBD987b86A62acC2Ba21B86C0d6EBb8849b14bb63`](https://base-sepolia.blockscout.com/address/0xBD987b86A62acC2Ba21B86C0d6EBb8849b14bb63) |
-| Test WETH | Base Sepolia | [`0x90fe15bca7d1A697c13971EfF8b792E5A814Ed19`](https://base-sepolia.blockscout.com/address/0x90fe15bca7d1A697c13971EfF8b792E5A814Ed19) |
-| Test WBTC | Base Sepolia | [`0x2EC5CcE4BAA0cD96280350d20411F882227941eb`](https://base-sepolia.blockscout.com/address/0x2EC5CcE4BAA0cD96280350d20411F882227941eb) |
-| Test USDC | Base Sepolia | [`0x151212a982AB75a300EdF6104A03E0556231E202`](https://base-sepolia.blockscout.com/address/0x151212a982AB75a300EdF6104A03E0556231E202) |
+| ShieldReactive | Reactive Lasna (5318007) | [`0x1d3cc73c0B805683fd7910f63BCf360e2a50D26E`](https://lasna.reactscan.net/address/0x1d3cc73c0B805683fd7910f63BCf360e2a50D26E) |
+| LiquidationShield | Base Sepolia (84532) | [`0x151c43a482687C07F603E85714F333EaA8eEd7f2`](https://base-sepolia.blockscout.com/address/0x151c43a482687C07F603E85714F333EaA8eEd7f2) |
+| DemoLoan | Base Sepolia | [`0x2Cb81B803689D7E2E07c04b263D4DE57cA410795`](https://base-sepolia.blockscout.com/address/0x2Cb81B803689D7E2E07c04b263D4DE57cA410795) |
+| MockAavePool | Base Sepolia | [`0x7C62dAA548158bcD1094a500F31635cAD6Ac0615`](https://base-sepolia.blockscout.com/address/0x7C62dAA548158bcD1094a500F31635cAD6Ac0615) |
+| MockAaveOracle | Base Sepolia | [`0xaDBE6445f707dd59581f9219a301b6d9Aa866A16`](https://base-sepolia.blockscout.com/address/0xaDBE6445f707dd59581f9219a301b6d9Aa866A16) |
+| WETH/USD feed (aggregator / proxy) | Base Sepolia | [`0x19250F87d9C3A06FBC91685D79075DE49eddaba4`](https://base-sepolia.blockscout.com/address/0x19250F87d9C3A06FBC91685D79075DE49eddaba4) |
+|  |  | [`0x5B2C01c9258Fe65199BD62aAA7e96dF76aFc56A6`](https://base-sepolia.blockscout.com/address/0x5B2C01c9258Fe65199BD62aAA7e96dF76aFc56A6) |
+| WBTC/USD feed (aggregator / proxy) | Base Sepolia | [`0xB7f86B2b6A36C8cb19546aB2BefC08434464Bc05`](https://base-sepolia.blockscout.com/address/0xB7f86B2b6A36C8cb19546aB2BefC08434464Bc05) |
+|  |  | [`0x1b8B5056882d70DD78D091DCAb9168228f09DE8D`](https://base-sepolia.blockscout.com/address/0x1b8B5056882d70DD78D091DCAb9168228f09DE8D) |
+| Test WETH | Base Sepolia | [`0xE1aC030Fa790dFE86c507c17596fc1a30F5979E1`](https://base-sepolia.blockscout.com/address/0xE1aC030Fa790dFE86c507c17596fc1a30F5979E1) |
+| Test WBTC | Base Sepolia | [`0xA01495f2e5D928BFB89473b6E5F79f50Af04B967`](https://base-sepolia.blockscout.com/address/0xA01495f2e5D928BFB89473b6E5F79f50Af04B967) |
+| Test USDC | Base Sepolia | [`0x599EB09E5d267765C63703211c1667607279354E`](https://base-sepolia.blockscout.com/address/0x599EB09E5d267765C63703211c1667607279354E) |
 | Lead WETH/USD feed | Ethereum Sepolia (11155111) | [`0x1d3cc73c0B805683fd7910f63BCf360e2a50D26E`](https://eth-sepolia.blockscout.com/address/0x1d3cc73c0B805683fd7910f63BCf360e2a50D26E) |
 
-Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`. Every Base Sepolia and Ethereum
+Callback proxy on Base Sepolia: `0x476F44b11F5C942c58f4c8E3d0300E5710743585`. ShieldReactive on Lasna and the lead feed on
+Ethereum Sepolia share an address because the deployer's nonce was the same on both chains; they are different
+contracts. Every Base Sepolia and Ethereum
 Sepolia contract above is source-verified on Sourcify (exact match). Earlier versions' addresses are in
 [`deployments.v1.env`](deployments.v1.env), [`deployments.v2.env`](deployments.v2.env) and
-[`deployments.v3.env`](deployments.v3.env).
+[`deployments.v3.env`](deployments.v3.env); the first v4 deploy (before the review fixes) is in
+[`deployments.v4-first.env`](deployments.v4-first.env).
 
 ### Full-loop transactions (origin event → callback)
 
 | Loop | 1. Price event | 2. Reactive tx, `RescueRequested` (Lasna) | 3. Rescue callback (Base) | Latency |
 |---|---|---|---|---|
-| Benchmark round 1 | [`0x1154…45e8`](https://base-sepolia.blockscout.com/tx/0x1154a8bccffc7bc814c4f534734a1e22208ffd762dfb2a43605ffe9b412f45e8) (Base) | [`0x41be…f93d`](https://lasna.reactscan.net/tx/0x41bec2087cc6b637eba802e3b965394f57c532f123792eef81247679e919f93d) | [`0x70aa…7852`](https://base-sepolia.blockscout.com/tx/0x70aae3a9b00b7a175d3989659bbd7079e1ccaa226d5de7dcd71d7398a03a7852) | 7 Base blocks (1.4 s) |
-| `script/demo.sh 1800` | [`0x8bf9…88ef`](https://base-sepolia.blockscout.com/tx/0x8bf9e69723cdc95da1d05ecf8ae906a10722e1673de400c3b714f694405b88ef) (Base) | [`0x8e96…c570`](https://lasna.reactscan.net/tx/0x8e967eaac1d173b23ced66e0a53a8b264a35b24f5329127471ed28a22aefc570) | [`0xa08d…abc3`](https://base-sepolia.blockscout.com/tx/0xa08d6b86ae6d4340c3f54df6a45e5fb1c4ad2b678da17e5fb8b7c3cf482fabc3) | 7 Base blocks (1.4 s) |
-| `DemoLoan.runWithMode(1)`, repay | [`0xe136…28ed`](https://base-sepolia.blockscout.com/tx/0xe13678e7baae652f3364b1c4ca99b2a0d431bff8ec1420e1bf645caf565928ed) (Base) | [`0x87ab…f04c`](https://lasna.reactscan.net/tx/0x87aba42cfdfde28c47c886757c5972a88cb961693b8b9eee1d722b93f223f04c) | [`0x2549…72c6`](https://base-sepolia.blockscout.com/tx/0x25491ee76fc96dcee74f5eddfd869995d72daf777e11236c998f101286db72c6) | 8 Base blocks (1.6 s) |
+| Benchmark round 1 | [`0x690a…1ce0`](https://base-sepolia.blockscout.com/tx/0x690aeaae81aba7d92bf8b6832aa86d7816710810e020b2f418757227b3021ce0) (Base) | [`0x508e…b17c`](https://lasna.reactscan.net/tx/0x508ec2783d24834d0155bf42a134e1d90a2d9808ebf8e25f6292b3df6d79b17c) | [`0x1bbe…dd03`](https://base-sepolia.blockscout.com/tx/0x1bbe50c5a46f9b41044a077648d4418366ce4aeacb2fa4007979558f0eeedd03) | 8 Base blocks (1.6 s) |
+| `DemoLoan.runWithMode(1)`, repay | [`0xcc5e…914a`](https://base-sepolia.blockscout.com/tx/0xcc5ebe8ede44b64540f1d8fe3e235bd586d75f7d5f56d818905ec985648e914a) (Base) | [`0xcb9a…c72a`](https://lasna.reactscan.net/tx/0xcb9a55589ded5f6b33f7ba1da4a13171aa26afb1eb5c89963e5ab294e169c72a) | [`0x7686…6933`](https://base-sepolia.blockscout.com/tx/0x7686f5e3f0c7ea9408346825c5c9f925987fc9555906e4fc9c3d06dace4c6933) | 6 Base blocks (1.2 s) |
 | Lead feed (second version) | [`0x3205…cd00`](https://eth-sepolia.blockscout.com/tx/0x3205623dc5126c391c9201481ea3140c61edffeabd4f79dcf3a886f67465cd00) (Ethereum Sepolia) | [`0xd442…e33e`](https://lasna.reactscan.net/tx/0xd442247264309eb66b637cfbf690b1ae017007e71b80610a38f85ecc1d60e33e) | [`0x8b47…9205`](https://base-sepolia.blockscout.com/tx/0x8b4712bdb4e198c7da3111e8bfd2a3a1347182c691e41a740ee0e6dadfc29205) | before Base's oracle moved |
 
 Every benchmark round's price, Lasna and rescue transactions are in `results/bench.csv`.
@@ -348,30 +353,29 @@ for new blocks; if Blockscout fails, it reads up to a day over RPC and says whic
 | `script/` | deploy, demo, lead feed, benchmark, exports |
 | `dashboard/` | the live page |
 
-## Fixes after v4 (in the code, not yet deployed)
+## Fixes after the first v4 deploy (all live)
 
-An outside review of `f38a97a` found five problems, and a follow-up audit found seven more. All are fixed here with a test each (57 tests).
-The dashboard fixes are live; the contract fixes take effect at the next deploy, so the deployed v4 still has them.
+An outside review of `f38a97a` found five problems, and a follow-up audit found seven more. All are fixed with a test each (57 tests) and
+are live: v4 was redeployed with them on 24 November 2026, with the slower `Cron10000` sweep (see below).
 
 | Problem | Fix | Live? |
 |---|---|---|
-| A partial rescue charged the 0.3% fee on the full top-up the loan needed, not on what the reserve could supply (0.003 WETH on a 0.007 WETH top-up) | The top-up and its fee are sized together, so the fee is 0.3% of what moves (or the 0.0001 ETH floor) | Next deploy |
-| The snapshot counted every aToken balance as collateral; Aave leaves out assets the borrower switched off and applies eMode thresholds, so the mirror could think a loan was safer than it is | Thresholds in the snapshot are scaled so the mirror's health factor matches the pool's own `getUserAccountData` | Next deploy |
-| An early request from a falling WBTC price sent a WBTC price as the hint, which the shield reads as a WETH price, so the rescue was skipped | Early requests come only from WETH moves; WBTC loans are rescued when they cross the trigger | Next deploy |
-| A tick that ran out of gas in a crowded bucket restarted at the front of that bucket, so later loans waited for the sweep | The scan remembers its place inside the bucket, and steps back when a landed rescue moves an unchecked loan behind it | Next deploy |
+| A partial rescue charged the 0.3% fee on the full top-up the loan needed, not on what the reserve could supply (0.003 WETH on a 0.007 WETH top-up) | The top-up and its fee are sized together, so the fee is 0.3% of what moves (or the 0.0001 ETH floor) | Live |
+| The snapshot counted every aToken balance as collateral; Aave leaves out assets the borrower switched off and applies eMode thresholds, so the mirror could think a loan was safer than it is | Thresholds in the snapshot are scaled so the mirror's health factor matches the pool's own `getUserAccountData` | Live |
+| An early request from a falling WBTC price sent a WBTC price as the hint, which the shield reads as a WETH price, so the rescue was skipped | Early requests come only from WETH moves; WBTC loans are rescued when they cross the trigger | Live |
+| A tick that ran out of gas in a crowded bucket restarted at the front of that bucket, so later loans waited for the sweep | The scan remembers its place inside the bucket, and steps back when a landed rescue moves an unchecked loan behind it | Live |
 | The dashboard said "safe again" after every rescue, even a partial one | It reads the health factor after the rescue: at target, above the trigger, under the trigger, or under 1.0 | Live |
-| Anyone could call the mock oracle's `setAssetPrice` in a loop, and every price event costs the reactive contract lREACT, so one person could switch the demo off | Only the deployer and `DemoLoan` (one run a minute) may move prices | Next deploy |
-| ETH forced into the shield without `receive()` made `opsLedger()` underflow and revert, breaking the dashboard's fee panel | Gas paid floors at 0 | Next deploy |
+| Anyone could call the mock oracle's `setAssetPrice` in a loop, and every price event costs the reactive contract lREACT, so one person could switch the demo off | Only the deployer and `DemoLoan` (one run a minute) may move prices | Live |
+| ETH forced into the shield without `receive()` made `opsLedger()` underflow and revert, breaking the dashboard's fee panel | Gas paid floors at 0 | Live |
 | The dashboard kept polling public RPCs from hidden tabs, and fell back to an old deployment's addresses if `deployment.json` failed to load | Hidden tabs skip the 10-second refresh; no fallback addresses, and the page says when live data is unavailable | Live |
-| `sync(address)` took an address that had to be the caller's own | `sync()` acts on the caller | Next deploy |
-| A loan protected with only a USDC repay reserve was watched for free: the watch fee comes out of the WETH reserve | Watching needs a WETH reserve in every mode | Next deploy |
+| `sync(address)` took an address that had to be the caller's own | `sync()` acts on the caller | Live |
+| A loan protected with only a USDC repay reserve was watched for free: the watch fee comes out of the WETH reserve | Watching needs a WETH reserve in every mode | Live |
 | The design kit's check reports (`dashboard/.taste-skill/`, `names.json`) were published on the site | Left out of deployments by `dashboard/.vercelignore` | Live |
 
 ## Limits
 
 - The pool is a mock with Aave V3's interface, because Aave's testnet oracle price can't be moved for a demo.
-  In the code, only the deployer and `DemoLoan` may move the test price (the deployed v4 still lets anyone);
-  everything else on the mocks (swapping a feed's aggregator, oracle sources, listing collateral, the borrow rate)
+  Only the deployer and `DemoLoan` (one run a minute) may move the test price; everything else on the mocks (swapping a feed's aggregator, oracle sources, listing collateral, the borrow rate)
   is the deployer's alone.
 - Collateral top-ups and fees are in WETH. Other collateral assets are watched and priced, but a rescue tops up
   with WETH.
