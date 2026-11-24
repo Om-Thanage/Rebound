@@ -612,6 +612,48 @@ contract ShieldTest is Test {
         assertApproxEqRel(rc.mirroredHF(bob), 1.375e18, 0.002e18, "mirror matches the pool, not the balances");
     }
 
+    /// OPEN for real Aave (documents the gap, see README "Limits"). Same loan as above: 1 WETH enabled, 0.01 WBTC
+    /// disabled, $1,200 debt. The snapshot spreads the pool's correction over both assets, so it is exact only at
+    /// snapshot prices. On a slow fall to $1,600 the pool says 1.100 while the mirror says about 1.161: no rescue is
+    /// requested although the loan is under its 1.15 trigger. (A single $400 jump is still caught: the projected
+    /// next step puts the mirror at about 1.118.) The next snapshot re-scales at current prices and closes the gap.
+    function test_disabledCollateralGapAfterASlowFall() public {
+        _movePrice(2000e8);
+        _movePrice(address(wbtc), 60_000e8);
+        _openLoan(bob, 1 ether, 1200e6);
+        wbtc.mint(bob, 0.01e8);
+        vm.startPrank(bob);
+        wbtc.approve(address(pool), type(uint256).max);
+        pool.supply(address(wbtc), 0.01e8, bob, 0);
+        vm.stopPrank();
+        bytes memory accountCall = abi.encodeWithSelector(MockAavePool.getUserAccountData.selector, bob);
+        vm.mockCall(address(pool), accountCall, abi.encode(uint256(2000e8), uint256(1200e8), uint256(0), uint256(8250), uint256(8000), uint256(1.375e18)));
+        _protect(bob, 0.5 ether);
+        uint256 calls = sys.callbackCount();
+
+        for (uint256 p = 1990; p >= 1600; p -= 10) {
+            _movePrice(p * 1e8); // $10 steps: each projection is only $10 lower
+        }
+        // the pool, with WBTC switched off: 1,600 x 0.825 / 1,200 = 1.100
+        vm.mockCall(address(pool), accountCall, abi.encode(uint256(1600e8), uint256(1200e8), uint256(0), uint256(8250), uint256(8000), uint256(1.1e18)));
+        assertEq(_hf(bob), 1.1e18, "pool: under the 1.15 trigger");
+        assertApproxEqRel(rc.mirroredHF(bob), 1.161e18, 0.002e18, "mirror: still above it");
+        assertEq(sys.callbackCount(), calls, "no rescue requested: the open gap");
+
+        _relaySync(bob); // any snapshot (sync, a CRON refresh after a day) re-scales at today's prices
+        assertApproxEqRel(rc.mirroredHF(bob), 1.1e18, 0.002e18, "re-scaled: mirror matches the pool again");
+        assertEq(rc.retryCount(), 1, "under its trigger: on the list every tick checks first");
+        _movePrice(1599e8);
+        assertEq(sys.callbackCount(), calls + 1, "the next price update requests the rescue");
+    }
+
+    function _relaySync(address who) internal {
+        vm.recordLogs();
+        vm.prank(who);
+        shield.sync();
+        _relayAll();
+    }
+
     function test_slowFallDoesNotTriggerEarly() public {
         _movePrice(2000e8);
         _protectAlice(1 ether);

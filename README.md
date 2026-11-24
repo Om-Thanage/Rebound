@@ -162,7 +162,7 @@ flowchart TB
     AGG -- "AnswerUpdated" --> RC
     PROXY -- "AggregatorConfirmed" --> RC
     LEAD -- "AnswerUpdated (lead)" --> RC
-    CRON -- "Cron100: sweep" --> RC
+    CRON -- "Cron10000 (about 3 h): sweep" --> RC
     RC == "rescue / refresh callback" ==> CP
     CP == "rescue(rvm, user, hint)" ==> LS
     LS -- "supply WETH or repay USDC" --> POOL
@@ -189,8 +189,24 @@ flowchart TB
    that balance. `opsLedger()` and `feeBreakdown()` show fees, watch fees, outside funding, gas paid, skipped
    callbacks and fee-less rescues.
 7. The shield emits a fresh snapshot, which clears the pending flag on Lasna. A rescue that never comes back stops
-   blocking the loan after 60 s. Every `Cron100` tick sweeps a batch of loans and asks the shield to re-publish
+   blocking the loan after 60 s. Every `Cron10000` tick sweeps a batch of loans and asks the shield to re-publish
    any whose mirror is a day old, since interest keeps adding to their debt.
+
+**What runs when.** Every price update (each feed, and the lead feed) does the time-critical work: it re-checks the
+retry list (loans under their trigger but in the shield's 10 s cooldown), the buckets near the new price (a
+loan whose rescue timed out is asked again there), and loans with several collateral assets, and it requests early rescues on a fast WETH fall.
+The CRON sweep is only the safety net. On Lasna `Cron10000` arrives every 10,000 blocks, about 2.95 hours (10,633 s
+and 10,592 s between the boundaries at blocks 9,130,000, 9,140,000 and 9,150,000). Each tick finishes any scan a
+crash interrupted and checks 50 loans, plus re-publishes up to 10 day-old ones. So:
+
+| A loan is missed because… | It is picked up |
+|---|---|
+| its rescue callback was lost | after 60 s, on the next price update that scans its bucket; if prices go quiet, at the next sweep (up to ~3 h) |
+| a crash crossed more triggers than one tick's gas | on the next price updates, which carry on the interrupted scan; else at the next sweep |
+| its mirror drifted (interest, collateral it changed without `sync()`) | when the sweep reaches it: up to ⌈loans ÷ 50⌉ sweeps, ~3 h each (500 loans: up to ~30 h) |
+
+`Cron100` (every ~100 s on Lasna) would cut those waits a hundredfold, at about 14 lREACT a day of idle cost
+instead of 0.15; the first v4 deploy ran that way and emptied its reserve in a day.
 
 ## What is different
 
@@ -239,7 +255,7 @@ falling fast, not from beating liquidators to a loan that is already liquidatabl
 What this measures is latency on one price path: every round drops the loan to 1.08, still above 1.0, and the
 dashboard demo posts both price steps in one transaction, so no rescue can land between them. It does not
 measure how often a rescue prevents a liquidation across realistic price paths and crowded triggers (late,
-partial and missed rescues included). That is the next experiment.
+partial and missed rescues included). The historical replay below is a first, simulated answer.
 
 **Lead feed, live (second version):** `script/lead.sh 1900` moved WETH to $1,900 on Ethereum Sepolia first. The rescue landed on
 Base 0.8 s after that update confirmed, **before Base's own oracle had moved** (it followed 10 s later).
@@ -255,7 +271,10 @@ the health factor rose from 1.08 to 1.40.
 **CRON, live:** the first three versions subscribed to `CronN` from the Omni system contract (`0x8888…`), but
 Reactive Network emits it from `0x0000000000000000000000000000000000fffFfF`, so the sweep never ran on Lasna. v4
 subscribes there and ticks: `cronTicks` was 1 within two minutes of the first v4 deploy. The redeploy uses
-`Cron10000`, which Lasna emits about every three hours, so a `cronTicks` of 0 in its first hours is expected.
+`Cron10000`, which Lasna emits about every three hours. Its first tick: the system event at Lasna block 9,160,000
+([`0xecd6…3e98`](https://lasna.reactscan.net/tx/0xecd6346bfd78aa502b50263b43f61d5d203cc3f96cffb8e91326076102c13e98),
+19:17 UTC on 24 November 2026) moved the watcher's `cronTicks` from 0 to 1 and `positionsChecked` from 14 to 16:
+the sweep checked both watched loans.
 
 **Reactive side, measured:** read from the system contract's `reserves()` for ShieldReactive. Idle, with no price
 moving, the first v4 deploy spent about **0.017 lREACT per `Cron100` tick**, roughly 0.6 lREACT an hour (0.051
@@ -267,6 +286,27 @@ loan snapshots) cost **0.111 lREACT** on the second version; the first version's
 price of REACT (about $0.0023) it is about $0.0003, which the floor covers. Watching costs gas on every price event
 while fees only arrive on rescues; the daily watch fee and the trigger buckets are there for that gap. Bridging fee
 income to REACT and calling `depositTo` is still manual.
+
+## Historical replay (simulated, not measured on testnet)
+
+`script/replay.mjs` replays Chainlink ETH/USD updates from Ethereum mainnet over the four crash windows above
+(2,998 updates, cached in [`results/sim/prices.json`](results/sim/prices.json) by `script/fetch-prices.mjs`)
+against identical loans: 10 ETH of collateral, starting HF 1.2 to 2.0, and the same reserve (20% of the debt, in
+USDC) under three strategies. Assumptions, per-window tables and every run:
+[`results/sim/summary.md`](results/sim/summary.md), [`results/sim/runs.csv`](results/sim/runs.csv).
+
+| Strategy (24 loans) | Liquidations | Cost (bonus lost + fees + interest) | Reserve unspent at the end |
+|---|---|---|---|
+| No intervention | 26 | $9,379 | $94,897 of $94,897 |
+| Upfront repayment | 7 | $2,886 | $0 |
+| Rebound, 1.4 s delay | 7 | $3,154 | $17,724 |
+
+With the same reserve, Rebound prevented as many liquidations as repaying upfront; the 7 left in both are loans
+whose reserve was too small for a 39% fall. Rebound was never late or missed a loan, even with a 300 s delay:
+Chainlink moves in steps of about 0.5%, so a loan crosses 1.15 well before 1.0. It cost $268 more in total (fees,
+and interest on debt it repaid later), and in exchange left 19% of the reserves unspent, where no crash reached
+them. Not modelled: gas for the upfront repayment, what the borrower earns on an unspent reserve, a feed that
+jumps more than one step at a time, and Reactive running out of lREACT.
 
 ## Deployed contracts
 
@@ -312,7 +352,7 @@ Sepolia ETH (for the lead feed), and Lasna lREACT (send Sepolia ETH to the fauce
 
 ```bash
 cp .env.example .env              # then put your testnet PRIVATE_KEY in .env (or point ENV_FILE at another file)
-forge test                        # 57 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
+forge test                        # 58 tests: modes, early trigger, lead feed, buckets, CRON, gas bounds, mock locks, fuzz
 bash script/deploy.sh             # predicts every address, deploys lead feed, Lasna, then Base; writes deployments.env
 bash script/status.sh             # health check: lREACT runway in demo runs, CRON firing, ledger, demo loan
 node script/export-deployment.mjs # points the dashboard at the new deployment
@@ -322,6 +362,9 @@ bash script/bench.sh 20           # 20 timed rounds -> results/bench.csv (START=
 node script/backfill-bench.mjs    # fills to_reactive_s for rounds that have a Lasna block but no value
 node script/export-bench.mjs      # feeds the dashboard's speed section
 node script/export-rescues.mjs    # snapshots every rescue for the dashboard's list (it adds newer ones live)
+node script/check-dashboard.mjs   # the dashboard's rescue outcome around 1.15 and 1.40
+node script/fetch-prices.mjs      # Chainlink ETH/USD history for the crash windows (cached in results/sim/)
+node script/replay.mjs            # SIMULATED replay: no intervention vs upfront repayment vs Rebound
 ```
 
 Open the dashboard over any static server (for example `npx serve dashboard`). It reads the contracts over
@@ -349,7 +392,7 @@ for new blocks; if Blockscout fails, it reads up to a day over RPC and says whic
 | `src/ShieldReactive.sol` | reactive contract: mirrors loans, buckets, early and lead-feed requests, aggregator following, CRON |
 | `src/DemoLoan.sol` | a protected loan anyone can reset and crash in two steps, in either mode |
 | `src/mocks/` | lending pool with Aave V3's signatures and maths (two collateral assets), Chainlink-style feeds, test tokens |
-| `test/Shield.t.sol` | 57 tests with a mocked system contract and callback proxy |
+| `test/Shield.t.sol` | 58 tests with a mocked system contract and callback proxy |
 | `script/` | deploy, demo, lead feed, benchmark, exports |
 | `dashboard/` | the live page |
 
@@ -381,8 +424,17 @@ are live: v4 was redeployed with them on 24 November 2026, with the slower `Cron
   with WETH.
 - The price hint (projected or lead price) is trusted up to 5% under the oracle. A manipulated lead feed can make
   a borrower top up early with their own funds, plus one fee; it cannot move funds anywhere else.
-- The snapshot matches the pool's health factor at today's prices, spread over all assets. A real-Aave version
-  should read each asset's collateral flag and the borrower's eMode category, and be checked against a Base fork.
+- **Open for production: real Aave collateral flags and eMode.** The snapshot scales every asset's threshold so
+  the mirror matches the pool's health factor at snapshot prices. After prices move, that spread is wrong when
+  assets differ: 1 WETH enabled, 0.01 WBTC switched off and $1,200 of debt, with WETH falling slowly from $2,000 to
+  $1,600, the pool says 1.100 and the mirror 1.161, so no rescue is requested under the 1.15 trigger
+  (`test_disabledCollateralGapAfterASlowFall`). A fast fall is still caught by the early request, and the next
+  snapshot (`sync()` or the day-old refresh) re-scales and the rescue follows. The destination's sizing reads the
+  pool's own collateral total, so disabled collateral is not counted there; with eMode it uses the asset's normal
+  threshold and tops up more than needed. The fix is to read each asset's collateral flag
+  (`getUserConfiguration`) and the borrower's eMode category in the snapshot and in rescue sizing, checked
+  against a pinned Base fork of Aave V3. What the deployed demo shows: the mock pool has no per-asset collateral
+  flags or eMode, so on it the mirror is exact; the gap above only appears on real Aave.
 - On mainnet, the REACT that pays for Reactive execution would be bought with fees and sent across with
   `depositTo`; on testnet the reactive contract is funded by hand.
 - A crash that crosses more triggers than one tick's gas budget is served over the following ticks or CRON sweeps,
