@@ -423,7 +423,8 @@ async function runRescue() {
     step(1, 'done', `Connected ${short(from)} on Base Sepolia`);
 
     n = 2;
-    step(2, 'now', 'Confirm in your wallet: DemoLoan.run(), no tokens or approvals');
+    // name the exact call the wallet shows, so the page and the confirmation match
+    step(2, 'now', `Confirm in your wallet: DemoLoan.${demoMode === 1 ? 'runWithMode(1), repay mode' : 'run(), collateral mode'}. 0 ETH, no tokens or approvals, only gas`);
     status('Step 2 of 5: confirm the transaction in your wallet.');
     const lasnaFrom = Number(await rpcAt(LASNA, 'eth_blockNumber', [])) - 2;
     const data = demoMode === 1 ? SEL.runWithMode + '1'.padStart(64, '0') : SEL.run;
